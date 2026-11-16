@@ -38,8 +38,16 @@ La app tiene una firma local (ad-hoc), no la de un desarrollador de Apple. En ot
 
 Para que abra sola al iniciar sesión, agregala en Configuración del Sistema → General → Ítems de inicio.
 
-## Verificación
+## Código
+
+- `Sources/SMNCore`: lógica sin interfaz y con tests. Incluye modelos, el parser CAP, las reglas de notificación, el pronóstico y `AlertMonitor`, que consulta al SMN; la red y el disco se inyectan, así que los tests simulan el SMN.
+- `Sources/SMNAlertas`: la app. `AppDelegate` coordina; `AlertNotifier` maneja las notificaciones y el sonido; `StatusItemController` maneja el ícono, el parpadeo y el menú.
+- Compila en modo Swift 6, con el chequeo estricto de concurrencia.
+
+## Tests
 
 ```sh
-swift run SelfCheck
+swift test
 ```
+
+Usan Swift Testing y simulan el SMN: límite de descargas, reintentos, caché en disco y avisos sin duplicados.

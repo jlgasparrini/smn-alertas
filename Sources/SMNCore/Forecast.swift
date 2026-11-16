@@ -1,8 +1,8 @@
 import Foundation
 
 /// Hourly forecast from Open-Meteo (free, no key).
-public struct HourlyForecast: Decodable {
-    public struct Hourly: Decodable {
+public struct HourlyForecast: Decodable, Sendable {
+    public struct Hourly: Decodable, Sendable {
         public let time: [String]
         public let precipitation: [Double?]
         public let precipitation_probability: [Int?]
@@ -13,14 +13,14 @@ public struct HourlyForecast: Decodable {
     public let hourly: Hourly
     public let utc_offset_seconds: Int
 
-    public static func url(lat: Double, lon: Double) -> URL {
-        URL(string: "https://api.open-meteo.com/v1/forecast?latitude=\(lat)&longitude=\(lon)"
+    public static func url(for c: Coordinate) -> URL {
+        URL(string: "https://api.open-meteo.com/v1/forecast?latitude=\(c.lat)&longitude=\(c.lon)"
             + "&hourly=precipitation,precipitation_probability,wind_gusts_10m,weather_code,snowfall"
             + "&timezone=auto&forecast_days=3")!
     }
 }
 
-public struct RiskWindow: Equatable {
+public struct RiskWindow: Equatable, Sendable {
     public let start: Date
     public let end: Date          // exclusive: start of the hour after the last risky one
     public let reasons: [String]

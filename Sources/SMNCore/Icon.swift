@@ -1,22 +1,32 @@
 import AppKit
 
-/// Menu bar image: the SF Symbol in the menu bar's text colour plus a coloured level dot (bottom-right).
+extension AlertLevel {
+    public var color: NSColor {
+        switch self {
+        case .yellow: .systemYellow
+        case .orange: .systemOrange
+        case .red: .systemRed
+        }
+    }
+}
+
+/// Menu bar image for the most severe alert: its SF Symbol in the menu bar's text colour plus a
+/// coloured level dot (bottom-right). No alert: a plain template icon that macOS tints itself.
 /// `dotVisible: false` keeps the same size so blinking doesn't shift neighbouring icons.
-public func menuBarImage(symbol: String, level: String?, dotVisible: Bool = true) -> NSImage {
+public func menuBarImage(for alert: CAPAlert?, dotVisible: Bool = true) -> NSImage {
     let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .regular)
-    let base = (NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
-        ?? NSImage(systemSymbolName: "exclamationmark.triangle", accessibilityDescription: nil)!)
+    let base = (NSImage(systemSymbolName: alert?.symbolName ?? "cloud.sun", accessibilityDescription: nil)
+        ?? NSImage(systemSymbolName: "cloud", accessibilityDescription: nil)!)
         .withSymbolConfiguration(config)!
-    let description = level.map { "Alerta \($0) del SMN" } ?? "Sin alertas del SMN"
-    guard let level else {
-        base.isTemplate = true            // plain icon: let macOS colour it like every other menu extra
-        base.accessibilityDescription = description
+    guard let alert else {
+        base.isTemplate = true
+        base.accessibilityDescription = "Sin alertas del SMN"
         return base
     }
 
     let dot: CGFloat = 7
     let size = NSSize(width: base.size.width + 3, height: max(base.size.height, 16))
-    let color: NSColor = level == "rojo" ? .systemRed : level == "naranja" ? .systemOrange : .systemYellow
+    let color = alert.level.color
     let image = NSImage(size: size, flipped: false) { rect in
         // Glyph tinted with labelColor, resolved against the menu bar's appearance at draw time.
         let glyphRect = NSRect(x: 0, y: (rect.height - base.size.height) / 2, width: base.size.width, height: base.size.height)
@@ -33,6 +43,6 @@ public func menuBarImage(symbol: String, level: String?, dotVisible: Bool = true
         return true
     }
     image.isTemplate = false
-    image.accessibilityDescription = description
+    image.accessibilityDescription = "\(alert.levelLabel) del SMN: \(alert.event)"
     return image
 }

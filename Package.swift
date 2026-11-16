@@ -1,4 +1,4 @@
-// swift-tools-version:5.9
+// swift-tools-version:6.0
 import PackageDescription
 
 let package = Package(
@@ -7,7 +7,6 @@ let package = Package(
     targets: [
         .target(name: "SMNCore"),
         .executableTarget(name: "SMNAlertas", dependencies: ["SMNCore"]),
-        // Assert-based self-check: Command Line Tools ship without XCTest.
-        .executableTarget(name: "SelfCheck", dependencies: ["SMNCore"]),
+        .testTarget(name: "SMNCoreTests", dependencies: ["SMNCore"]),
     ]
 )
