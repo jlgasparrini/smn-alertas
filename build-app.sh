@@ -1,17 +1,29 @@
 #!/bin/sh
 # Builds SMN Alertas.app (menu bar agent) with SwiftPM; no Xcode needed.
+#   ./build-app.sh 1.1.0         production: universal app + release zip
+#   ./build-app.sh 1.1.0 --dev   development: adds "Probar estados" (DEV_TOOLS), no zip
 set -e
 cd "$(dirname "$0")"
 VERSION="${1:-1.0.0}"
+DEV=false
+[ "$2" = "--dev" ] && DEV=true
+
+FLAGS=""
+SCRATCH=.build
+if $DEV; then
+    FLAGS="-Xswiftc -DDEV_TOOLS"
+    SCRATCH=.build-dev          # separate cache so switching builds doesn't recompile everything
+fi
+
 # Universal binary: runs on Intel and Apple silicon Macs.
 for arch in arm64 x86_64; do
-    swift build -c release --product SMNAlertas --triple "$arch-apple-macosx13.0"
+    swift build -c release --product SMNAlertas --triple "$arch-apple-macosx13.0" --scratch-path "$SCRATCH" $FLAGS
 done
 APP="build/SMN Alertas.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
 lipo -create -output "$APP/Contents/MacOS/SMNAlertas" \
-    .build/arm64-apple-macosx/release/SMNAlertas .build/x86_64-apple-macosx/release/SMNAlertas
+    "$SCRATCH/arm64-apple-macosx/release/SMNAlertas" "$SCRATCH/x86_64-apple-macosx/release/SMNAlertas"
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -28,6 +40,10 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 PLIST
 # Ad-hoc signature: notifications need a signed bundle with an identifier.
 codesign --force --sign - "$APP"
-# Release zip; ditto keeps the bundle's signature and metadata intact.
-ditto -c -k --keepParent "$APP" "build/SMN-Alertas-$VERSION.zip"
-echo "Built $APP and build/SMN-Alertas-$VERSION.zip"
+if $DEV; then
+    echo "Built $APP (development, with Probar estados)"
+else
+    # Release zip; ditto keeps the bundle's signature and metadata intact.
+    ditto -c -k --keepParent "$APP" "build/SMN-Alertas-$VERSION.zip"
+    echo "Built $APP and build/SMN-Alertas-$VERSION.zip"
+fi

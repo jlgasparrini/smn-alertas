@@ -27,6 +27,14 @@ struct ForecastTests {
         #expect(text.contains("18:00–19:00"))
     }
 
+    @Test func pointsCoverTheWindowAndDefaultMissingValuesToZero() {
+        let points = forecast.points(from: from, to: from.addingTimeInterval(24 * 3600))
+        #expect(points.count == 6)                                    // 14:00 overlaps 14:30, so it's included
+        #expect(points[1].risks == ["tormenta", "lluvia fuerte"])
+        #expect(points[2].risks == ["ráfagas"])
+        #expect(points[5].precipitation == 0 && points[5].risks.isEmpty)   // all-null hour
+    }
+
     @Test func emptyReportStillSaysTheAlertIsOn() {
         #expect(report([]).contains("la alerta sigue vigente"))
     }

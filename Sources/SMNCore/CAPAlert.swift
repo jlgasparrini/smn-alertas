@@ -85,3 +85,30 @@ public func alertsToNotify(active: [CAPAlert], previous: [String: AlertLevel])
     }
     return (notify.sorted { $0.level > $1.level }, state)
 }
+
+extension CAPAlert {
+    /// Event name for display: SMN short-term notices come in ALL CAPS ("TORMENTAS FUERTES" -> "Tormentas fuertes").
+    public var displayEvent: String { sentenceCased(event) }
+    public var displayDescription: String { sentenceCased(description) }
+
+    /// SMN recommendations as separate steps. Alerts number them ("1- Evitá salir. 2- No saques…");
+    /// short-term notices write plain sentences.
+    public var instructionSteps: [String] {
+        let numbered = instruction.replacingOccurrences(of: #"(^|\s)\d+\s*-\s*"#, with: "\n", options: .regularExpression)
+        let parts = numbered.contains("\n") ? numbered.components(separatedBy: "\n")
+                                            : instruction.components(separatedBy: ". ")
+        return parts.map { $0.trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: "."))) }
+            .filter { !$0.isEmpty }
+    }
+}
+
+/// "TORMENTAS FUERTES CON GRANIZO" -> "Tormentas fuertes con granizo"; mixed-case text is left alone.
+public func sentenceCased(_ s: String) -> String {
+    guard s == s.uppercased(), s.contains(where: \.isLetter) else { return s }
+    let lower = s.lowercased(with: Locale(identifier: "es_AR"))
+    return lower.prefix(1).uppercased() + lower.dropFirst()
+}
+
+extension City: Identifiable {
+    public var id: String { "\(name)|\(coordinate.lat)|\(coordinate.lon)" }
+}

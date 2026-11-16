@@ -31,12 +31,60 @@ let thunderCodes = 95...99        // WMO weather codes for thunderstorms
 let heavyRainMM = 2.0
 let strongGustKMH = 50.0
 
+/// One forecast hour, ready for charts and risk checks.
+public struct HourPoint: Identifiable, Equatable, Sendable {
+    public let date: Date
+    public let precipitation: Double      // mm
+    public let gust: Double               // km/h
+    public let weatherCode: Int?
+    public let snowfall: Double           // cm
+    public var id: Date { date }
+
+    public init(date: Date, precipitation: Double, gust: Double, weatherCode: Int?, snowfall: Double) {
+        self.date = date
+        self.precipitation = precipitation
+        self.gust = gust
+        self.weatherCode = weatherCode
+        self.snowfall = snowfall
+    }
+
+    /// Why this hour deserves care; empty when it doesn't.
+    public var risks: [String] {
+        var r: [String] = []
+        if let c = weatherCode, thunderCodes.contains(c) { r.append("tormenta") }
+        if precipitation >= heavyRainMM { r.append("lluvia fuerte") }
+        if gust >= strongGustKMH { r.append("ráfagas") }
+        if snowfall > 0 { r.append("nieve") }
+        return r
+    }
+}
+
+extension HourlyForecast {
+    /// Hours overlapping `from..<to`. Missing values count as zero.
+    public func points(from: Date, to: Date) -> [HourPoint] {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd'T'HH:mm"
+        fmt.locale = Locale(identifier: "en_US_POSIX")
+        fmt.timeZone = TimeZone(secondsFromGMT: utc_offset_seconds)
+        let h = hourly
+        return h.time.indices.compactMap { i in
+            guard let t = fmt.date(from: h.time[i]), t.addingTimeInterval(3600) > from, t < to else { return nil }
+            return HourPoint(date: t,
+                             precipitation: (h.precipitation[safe: i] ?? nil) ?? 0,
+                             gust: (h.wind_gusts_10m[safe: i] ?? nil) ?? 0,
+                             weatherCode: h.weather_code[safe: i] ?? nil,
+                             snowfall: (h.snowfall[safe: i] ?? nil) ?? 0)
+        }
+    }
+}
+
 /// Groups consecutive risky hours between `from` and `to` into windows.
 public func riskWindows(_ f: HourlyForecast, from: Date, to: Date) -> [RiskWindow] {
-    let fmt = DateFormatter()
-    fmt.dateFormat = "yyyy-MM-dd'T'HH:mm"
-    fmt.timeZone = TimeZone(secondsFromGMT: f.utc_offset_seconds)
-    let h = f.hourly
+    riskWindows(f.points(from: from, to: to))
+}
+
+/// Groups consecutive risky hours into windows.
+public func riskWindows(_ points: [HourPoint]) -> [RiskWindow] {
     var windows: [RiskWindow] = []
     var current: (start: Date, end: Date, reasons: [String])?
 
@@ -45,25 +93,17 @@ public func riskWindows(_ f: HourlyForecast, from: Date, to: Date) -> [RiskWindo
         current = nil
     }
 
-    for i in h.time.indices {
-        guard let t = fmt.date(from: h.time[i]) else { continue }
-        let hourEnd = t.addingTimeInterval(3600)
-        guard hourEnd > from, t < to else { continue }
-
-        var reasons: [String] = []
-        if let c = h.weather_code[safe: i] ?? nil, thunderCodes.contains(c) { reasons.append("tormenta") }
-        if let p = h.precipitation[safe: i] ?? nil, p >= heavyRainMM { reasons.append("lluvia fuerte") }
-        if let g = h.wind_gusts_10m[safe: i] ?? nil, g >= strongGustKMH { reasons.append("ráfagas") }
-        if let s = h.snowfall[safe: i] ?? nil, s > 0 { reasons.append("nieve") }
-
+    for p in points {
+        let reasons = p.risks
+        let hourEnd = p.date.addingTimeInterval(3600)
         if reasons.isEmpty { close(); continue }
-        if var c = current, c.end == t {
+        if var c = current, c.end == p.date {
             c.end = hourEnd
             for r in reasons where !c.reasons.contains(r) { c.reasons.append(r) }
             current = c
         } else {
             close()
-            current = (t, hourEnd, reasons)
+            current = (p.date, hourEnd, reasons)
         }
     }
     close()

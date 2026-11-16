@@ -7,16 +7,15 @@ import SMNCore
 final class AlertNotifier: NSObject, UNUserNotificationCenterDelegate {
     /// Called when the user clicks a notification.
     var onOpen: () -> Void = {}
+    /// Called when macOS permission changes; `false` means alerts would fail silently, so the UI must say so.
+    var onAuthorizationChange: (Bool) -> Void = { _ in }
+    private var allowed: Bool?
     private let center = UNUserNotificationCenter.current()
 
     override init() {
         super.init()
         center.delegate = self
     }
-
-    /// False when the user turned notifications off for the app: the UI must say so, or alerts fail silently.
-    private(set) var notificationsAllowed = true
-    var onAuthorizationChange: () -> Void = {}
 
     // Callbacks are @Sendable: the system calls them on a background queue, and a main-actor
     // closure would trap at runtime in Swift 6.
@@ -29,11 +28,14 @@ final class AlertNotifier: NSObject, UNUserNotificationCenterDelegate {
 
     func refreshAuthorizationStatus() {
         center.getNotificationSettings { @Sendable [weak self] settings in
-            let allowed = [.authorized, .provisional].contains(settings.authorizationStatus)
+            let status = settings.authorizationStatus
+            let allowed = [.authorized, .provisional].contains(status)
+            // The request's own error can disagree with System Settings; this status is what delivery uses.
+            log.notice("notification status=\(allowed ? "allowed" : "blocked", privacy: .public) raw=\(status.rawValue)")
             Task { @MainActor in
-                guard let self, self.notificationsAllowed != allowed else { return }
-                self.notificationsAllowed = allowed
-                self.onAuthorizationChange()
+                guard let self, self.allowed != allowed else { return }
+                self.allowed = allowed
+                self.onAuthorizationChange(allowed)
             }
         }
     }
@@ -44,7 +46,7 @@ final class AlertNotifier: NSObject, UNUserNotificationCenterDelegate {
 
     func post(_ alert: CAPAlert, body: String) {
         let content = UNMutableNotificationContent()
-        content.title = "\(alert.level.emoji) \(alert.levelLabel): \(alert.event.capitalized)"
+        content.title = "\(alert.level.emoji) \(alert.levelLabel): \(alert.displayEvent)"
         content.subtitle = validity(of: alert)
         content.body = body
         content.sound = nil        // the app plays its own per-level sound; avoid a double chime
@@ -53,7 +55,6 @@ final class AlertNotifier: NSObject, UNUserNotificationCenterDelegate {
 
     /// Yellow: one soft ping. Orange: one louder chime. Red: three chimes.
     func playSound(for level: AlertLevel) {
-        guard Preferences.soundEnabled else { return }
         log.notice("sound \(level.name(), privacy: .public)")
         let (name, times) = switch level {
         case .red: ("Sosumi", 3)
@@ -82,8 +83,13 @@ final class AlertNotifier: NSObject, UNUserNotificationCenterDelegate {
 /// "Vigente hasta lun 16 18:00".
 func validity(of alert: CAPAlert) -> String {
     guard let expires = alert.expires else { return "Vigente" }
+    return "Vigente hasta \(formatted(expires, "EEE d HH:mm"))"
+}
+
+/// Date in Argentine Spanish with a fixed pattern, e.g. "EEE d HH:mm" -> "lun 16 18:00".
+func formatted(_ date: Date, _ pattern: String) -> String {
     let f = DateFormatter()
-    f.dateFormat = "EEE d HH:mm"
+    f.dateFormat = pattern
     f.locale = Locale(identifier: "es_AR")
-    return "Vigente hasta \(f.string(from: expires))"
+    return f.string(from: date)
 }

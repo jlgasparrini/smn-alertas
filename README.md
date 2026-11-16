@@ -21,14 +21,17 @@ App de barra de menú para macOS que avisa cuando el Servicio Meteorológico Nac
 
 Cuando llega algo nuevo, el punto parpadea y suena un sonido cada 4 segundos hasta que abrís el menú: Ping (amarillo), Hero (naranja) o Sosumi ×3 (rojo). El sonido se corta solo a los 2 minutos y se puede apagar desde el menú. Suena aunque esté activado "No molestar".
 
-El submenú **Probar estados** simula cada caso (ícono, parpadeo, sonido y notificación). Mientras está activo no se consulta al SMN; para volver, elegí **Volver a los datos reales**.
+Al tocar el ícono se abre un panel con una fila por fenómeno (por ejemplo "Amarilla hasta las 20:59 · luego naranja hasta el mar 02:59"), los detalles y recomendaciones del SMN plegados, y un gráfico de lluvia de las próximas 24 h con las horas de más cuidado. En **Ajustes** se elige la ciudad (con sugerencias), el sonido, el silencio nocturno de las amarillas y si la app abre al iniciar sesión.
+
+En el build de desarrollo, **Probar estados** (menú ··· del panel) simula cada caso. Mientras está activo no se consulta al SMN; para volver, elegí **Volver a los datos reales**.
 
 ## Compilar y abrir
 
 Necesita macOS 13 o superior y las Command Line Tools de Xcode (no hace falta Xcode).
 
 ```sh
-./build-app.sh 1.0.0          # versión opcional; por defecto 1.0.0
+./build-app.sh 1.1.0          # producción: app universal + zip para la release
+./build-app.sh 1.1.0 --dev    # desarrollo: agrega "Probar estados" en el menú ··· del panel
 open "build/SMN Alertas.app"
 ```
 
@@ -41,13 +44,18 @@ Para que abra sola al iniciar sesión, agregala en Configuración del Sistema �
 ## Código
 
 - `Sources/SMNCore`: lógica sin interfaz y con tests. Incluye modelos, el parser CAP, las reglas de notificación, el pronóstico y `AlertMonitor`, que consulta al SMN; la red y el disco se inyectan, así que los tests simulan el SMN.
-- `Sources/SMNAlertas`: la app. `AppDelegate` coordina; `AlertNotifier` maneja las notificaciones y el sonido; `StatusItemController` maneja el ícono, el parpadeo y el menú.
+- `Sources/SMNAlertas`: la app. `AppModel` es la fuente única de estado; `PanelView` y `SettingsView` (SwiftUI) la muestran; `StatusItemController` maneja el ícono, el parpadeo y el panel; `AlertNotifier` maneja las notificaciones y el sonido.
 - Compila en modo Swift 6, con el chequeo estricto de concurrencia.
 
 ## Tests
 
 ```sh
-swift test
+swift test          # lógica (Swift Testing), con el SMN simulado y archivos reales del SMN como muestra
+./smoke-test.sh     # abre la app compilada y verifica que arranca, consulta al SMN y tiene permiso de notificaciones
 ```
 
-Usan Swift Testing y simulan el SMN: límite de descargas, reintentos, caché en disco y avisos sin duplicados.
+La interfaz se revisa a mano con "Probar estados" (build de desarrollo) o generando capturas de cada estado, en modo claro y oscuro:
+
+```sh
+"build/SMN Alertas.app/Contents/MacOS/SMNAlertas" --snapshots /tmp/smn-capturas   # solo build de desarrollo
+```

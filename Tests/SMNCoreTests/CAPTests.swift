@@ -104,3 +104,31 @@ struct NotificationPolicyTests {
         #expect(r.notify.map(\.id) == ["2"])
     }
 }
+
+@Suite("Display text")
+struct DisplayTextTests {
+    @Test func sentenceCasesAllCapsOnly() {
+        #expect(sentenceCased("TORMENTAS FUERTES CON CAIDA DE GRANIZO") == "Tormentas fuertes con caida de granizo")
+        #expect(sentenceCased("Tormentas") == "Tormentas")
+        #expect(sentenceCased("") == "")
+    }
+
+    @Test func numberedInstructionsBecomeSteps() {
+        var a = CAPAlert()
+        a.instruction = "1- Evitá salir. 2- No saques la basura y limpiá desagües. 3- Desconectá los electrodomésticos"
+        #expect(a.instructionSteps == ["Evitá salir", "No saques la basura y limpiá desagües", "Desconectá los electrodomésticos"])
+    }
+
+    @Test func sentenceInstructionsBecomeSteps() {
+        var a = CAPAlert()
+        a.instruction = "Retirá objetos sueltos. Cerrá y alejate de ventanas. Permanecé en lugares cerrados."
+        #expect(a.instructionSteps == ["Retirá objetos sueltos", "Cerrá y alejate de ventanas", "Permanecé en lugares cerrados"])
+    }
+
+    @Test func realAlertInstructionsSplit() throws {
+        let url = try #require(Bundle.module.url(forResource: "alerta", withExtension: "xml", subdirectory: "Fixtures"))
+        let a = try #require(CAPParser.parse(try Data(contentsOf: url)))
+        #expect(a.instructionSteps.count >= 3)
+        #expect(a.instructionSteps.allSatisfy { !$0.first!.isNumber })
+    }
+}

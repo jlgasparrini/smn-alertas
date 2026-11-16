@@ -7,6 +7,6 @@ let package = Package(
     targets: [
         .target(name: "SMNCore"),
         .executableTarget(name: "SMNAlertas", dependencies: ["SMNCore"]),
-        .testTarget(name: "SMNCoreTests", dependencies: ["SMNCore"]),
+        .testTarget(name: "SMNCoreTests", dependencies: ["SMNCore"], resources: [.copy("Fixtures")]),
     ]
 )

@@ -103,6 +103,34 @@ struct AlertMonitorTests {
         #expect(relaunched.active.count == 1)
     }
 
+    @Test func ignoresExpiredAlerts() async {
+        let url = capURL("old")
+        await http.set(url, capXML(id: "old", expires: "2020-01-01T00:00:00-03:00"))
+        await http.set(AlertMonitor.feedURL, rss([url]))
+        let m = monitor()
+        #expect(await m.check(at: riocuarto).isEmpty)
+        #expect(m.active.isEmpty)
+    }
+
+    @Test func downloadsTheUsersRegionFirstOnceLearned() async {
+        let mine = capURL("mine", region: "Patagonia")
+        await http.set(mine, capXML(id: "mine"))
+        await http.set(AlertMonitor.feedURL, rss([mine]))
+        await monitor().check(at: riocuarto)                  // learns "Patagonia"
+
+        // New batch: two other-region zones listed before ours, budget of one download.
+        let others = [capURL("a", region: "Llanura"), capURL("b", region: "Cordillera")]
+        let next = capURL("mine2", region: "Patagonia")
+        for u in others { await http.set(u, capXML(id: u.lastPathComponent, around: Coordinate(lat: -50, lon: -70))) }
+        await http.set(next, capXML(id: "mine2", severity: "Severe"))
+        await http.set(AlertMonitor.feedURL, rss(others + [next]))
+        await http.clearLog()
+        let fresh = await AlertMonitor(http: http, store: MemoryStore(), defaults: defaults, maxDownloadsPerCheck: 1)
+            .check(at: riocuarto)
+        #expect(await http.requests.contains(next))
+        #expect(fresh.map(\.id) == ["mine2"])
+    }
+
     @Test func reportsFeedErrors() async {
         await http.fail(AlertMonitor.feedURL)
         let m = monitor()
