@@ -28,9 +28,13 @@ El submenú **Probar estados** simula cada caso (ícono, parpadeo, sonido y noti
 Necesita macOS 13 o superior y las Command Line Tools de Xcode (no hace falta Xcode).
 
 ```sh
-./build-app.sh
+./build-app.sh 1.0.0          # versión opcional; por defecto 1.0.0
 open "build/SMN Alertas.app"
 ```
+
+Genera un binario universal (Intel y Apple silicon) y `build/SMN-Alertas-<versión>.zip` para compartir.
+
+La app tiene una firma local (ad-hoc), no la de un desarrollador de Apple. En otra Mac, la primera vez hay que abrirla con clic derecho → Abrir, o desde Configuración del Sistema → Privacidad y seguridad → "Abrir igualmente".
 
 Para que abra sola al iniciar sesión, agregala en Configuración del Sistema → General → Ítems de inicio.
 
