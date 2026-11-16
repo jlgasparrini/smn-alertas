@@ -49,4 +49,40 @@ assert(w[1].reasons == ["lluvia fuerte"])
 let text = report(w, timeZone: TimeZone(secondsFromGMT: -10800)!)
 assert(text.contains("15:00–17:00") && text.contains("18:00–19:00"), text)
 print(text)
+
+// Notify once per event; re-notify only when the level rises or the event comes back.
+func alert(_ id: String, _ event: String, _ severity: String) -> CAPAlert {
+    var x = CAPAlert(); x.identifier = id; x.event = event; x.severity = severity
+    x.url = URL(string: "https://ssl.smn.gob.ar/feeds/CAP/xml_generados/CAP_1_Tormenta_Llanura_alertas_alertas_\(id).xml")
+    return x
+}
+var r = alertsToNotify(active: [alert("1", "Tormentas", "Moderate"), alert("2", "Tormentas", "Moderate")], previous: [:])
+assert(r.notify.count == 1 && r.state == ["TORMENTAS": 1])
+r = alertsToNotify(active: [alert("3", "Tormentas", "Moderate")], previous: r.state)   // SMN update, new id
+assert(r.notify.isEmpty)
+r = alertsToNotify(active: [alert("4", "Tormentas", "Severe")], previous: r.state)     // escalation
+assert(r.notify.map(\.identifier) == ["4"] && r.state == ["TORMENTAS": 2])
+r = alertsToNotify(active: [], previous: r.state)                                        // ended
+assert(r.state.isEmpty)
+r = alertsToNotify(active: [alert("5", "Tormentas", "Moderate")], previous: r.state)   // back again
+assert(r.notify.count == 1)
+var acp = alert("6", "TORMENTAS", "Severe")
+acp.url = URL(string: "https://ssl.smn.gob.ar/feeds/CAP/avisocortoplazo/2026_11_16_1622_cap_es.xml")
+r = alertsToNotify(active: [alert("7", "Tormentas", "Moderate"), acp], previous: ["TORMENTAS": 1])
+assert(r.notify.map(\.identifier) == ["6"])                                              // short-term notice is separate
+
+// Menu bar icon: phenomenon of the worst alert; short-term notices get the warning triangle.
+assert(menuBarIcon(for: []) == ("cloud.sun", nil))
+var stormHail = alert("8", "Tormentas", "Moderate"); stormHail.description = "ocasional granizo"
+assert(menuBarIcon(for: [stormHail]) == ("cloud.bolt.rain", "amarillo"))
+assert(menuBarIcon(for: [stormHail, alert("9", "Viento", "Severe")]) == ("wind", "naranja"))
+var acpHail = acp; acpHail.headline = "AVISO NARANJA POR TORMENTAS CON CAIDA DE GRANIZO"
+assert(menuBarIcon(for: [alert("10", "Viento", "Severe"), acpHail]) == ("exclamationmark.triangle.fill", "naranja"))  // tie -> short-term
+assert(menuBarIcon(for: [alert("14", "Granizo raro", "Moderate")]).symbol == "cloud")                             // unknown event
+assert(menuBarIcon(for: [alert("11", "Viento Zonda", "Moderate")]).symbol == "wind")
+assert(menuBarIcon(for: [alert("12", "Nevadas", "Moderate")]).symbol == "snowflake")
+assert(menuBarIcon(for: [alert("13", "Lluvias", "Moderate")]).symbol == "cloud.heavyrain")
+
+assert(capRegion(alert("1", "", "").url!) == "Llanura")
+assert(capRegion(acp.url!) == nil)
 print("SelfCheck OK")

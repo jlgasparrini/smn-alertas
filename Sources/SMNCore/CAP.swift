@@ -14,6 +14,8 @@ public struct CAPAlert: Equatable {
     public var polygons: [[(lat: Double, lon: Double)]] = []
     public var url: URL?
 
+    public init() {}
+
     public static func == (a: CAPAlert, b: CAPAlert) -> Bool { a.identifier == b.identifier }
 
     /// SMN colour level, derived from the CAP severity (the headline wins when it names a colour).
@@ -103,6 +105,50 @@ public final class CAPParser: NSObject, XMLParserDelegate {
     }
 
     static func date(_ s: String) -> Date? { ISO8601DateFormatter().date(from: s) }
+}
+
+public func levelRank(_ level: String) -> Int { ["amarillo": 1, "naranja": 2, "rojo": 3][level] ?? 0 }
+
+/// SMN re-issues each alert with a new identifier on every update, so notify per event instead:
+/// only when an event appears or its level rises. `previous` maps event key -> highest level rank last time.
+public func alertsToNotify(active: [CAPAlert], previous: [String: Int]) -> (notify: [CAPAlert], state: [String: Int]) {
+    var worst: [String: CAPAlert] = [:]
+    for a in active {
+        let key = (a.url?.path.contains("avisocortoplazo") == true ? "ACP:" : "") + a.event.uppercased()
+        if let w = worst[key], levelRank(w.level) >= levelRank(a.level) { continue }
+        worst[key] = a
+    }
+    let state = worst.mapValues { levelRank($0.level) }
+    let notify = worst.filter { state[$0.key]! > (previous[$0.key] ?? 0) }.map(\.value)
+    return (notify.sorted { levelRank($0.level) > levelRank($1.level) }, state)
+}
+
+extension CAPAlert {
+    public var isShortTerm: Bool { url?.path.contains("avisocortoplazo") == true }
+    public var mentionsHail: Bool { (headline + " " + description).uppercased().contains("GRANIZO") }
+}
+
+/// Menu bar icon for the current situation: SF Symbol of the worst alert's phenomenon plus its level.
+/// Short-term notices (it's happening now) get a filled warning triangle so they stand out from the outlined weather glyphs.
+public func menuBarIcon(for active: [CAPAlert]) -> (symbol: String, level: String?) {
+    guard let worst = active.max(by: {
+        (levelRank($0.level), $0.isShortTerm ? 1 : 0) < (levelRank($1.level), $1.isShortTerm ? 1 : 0)
+    }) else { return ("cloud.sun", nil) }
+    let text = (worst.event + " " + worst.headline).uppercased()
+    let symbol: String
+    if worst.isShortTerm { symbol = "exclamationmark.triangle.fill" }
+    else if text.contains("TORMENTA") { symbol = "cloud.bolt.rain" }
+    else if text.contains("NEV") || text.contains("NIEVE") { symbol = "snowflake" }
+    else if text.contains("VIENTO") || text.contains("ZONDA") { symbol = "wind" }
+    else if text.contains("LLUVIA") { symbol = "cloud.heavyrain" }
+    else { symbol = "cloud" }
+    return (symbol, worst.level)
+}
+
+/// Region in alert file names, e.g. CAP_20261116125045_Tormenta_Llanura_alertas_alertas_18.xml -> "Llanura".
+public func capRegion(_ url: URL) -> String? {
+    let parts = url.lastPathComponent.split(separator: "_")
+    return parts.first == "CAP" && parts.count > 3 ? String(parts[3]) : nil
 }
 
 /// ssl.smn.gob.ar/CAP/AR.php serves RSS to apps and an HTML view to browsers; both list the CAP XML URLs.
