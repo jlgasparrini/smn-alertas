@@ -22,7 +22,8 @@ public final class AlertMonitor: ObservableObject {
     private let maxDownloads: Int
     private let now: @Sendable () -> Date
     private var cache: [URL: CAPAlert?] = [:]      // .some(nil): downloaded, but not a usable alert
-    private var isChecking = false
+    /// True while a check runs; the panel shows a spinner instead of the refresh button.
+    @Published public private(set) var isChecking = false
 
     private enum Key {
         static let notified = "notifiedLevels"     // [event key: AlertLevel.rawValue]

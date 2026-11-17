@@ -25,10 +25,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.start()
     }
 
+    @objc private func openSettings() { settings.show() }
+
     /// Menu-bar-only apps have no visible menu, but text fields still need ⌘C/⌘V and windows ⌘W.
     private static func mainMenu() -> NSMenu {
         let main = NSMenu()
         let app = NSMenu()
+        // Main-menu key equivalents work from the panel and the Settings window alike.
+        app.addItem(withTitle: "Ajustes…", action: #selector(openSettings), keyEquivalent: ",")
+        app.addItem(.separator())
         app.addItem(withTitle: "Salir de SMN Alertas", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         let edit = NSMenu(title: "Edición")
         edit.addItem(withTitle: "Cortar", action: #selector(NSText.cut(_:)), keyEquivalent: "x")

@@ -39,7 +39,7 @@ struct PanelView: View {
                 calm
             } else {
                 ForEach(groups) { AlertRow(group: $0) }
-                if !model.hours.isEmpty { ForecastCard(hours: model.hours) }
+                if !model.hours.isEmpty { ForecastCard(hours: model.hours, level: groups.map(\.worst.level).max() ?? .yellow) }
             }
         }
     }
@@ -53,12 +53,21 @@ struct PanelView: View {
                 Text(subtitle).font(.subheadline).foregroundStyle(.secondary)
             }
             Spacer()
-            Button { Task { await model.refresh() } } label: { Image(systemName: "arrow.clockwise") }
-                .buttonStyle(.borderless)
-                .help("Actualizar")
-                .accessibilityLabel("Actualizar")
+            Button { Task { await model.refresh() } } label: {
+                if model.monitor.isChecking {
+                    ProgressView().controlSize(.small).accessibilityLabel("Consultando al SMN")
+                } else {
+                    Image(systemName: "arrow.clockwise")
+                }
+            }
+            .frame(width: 20, height: 20)
+            .buttonStyle(.borderless)
+            .keyboardShortcut("r")
+            .disabled(model.monitor.isChecking)
+            .help("Actualizar (⌘R)")
+            .accessibilityLabel("Actualizar")
             Menu {
-                Button("Ajustes…") { model.onOpenSettings() }
+                Button("Ajustes…") { model.onOpenSettings() }.keyboardShortcut(",")
                 #if DEV_TOOLS
                 Menu("Probar estados") {
                     ForEach(DemoState.all, id: \.title) { state in Button(state.title) { model.runDemo(state) } }
@@ -285,6 +294,8 @@ private extension String {
 
 private struct ForecastCard: View {
     let hours: [HourPoint]
+    /// The riskiest hours are shaded in the colour of the worst level they fall under.
+    let level: AlertLevel
 
     private var windows: [RiskWindow] { riskWindows(hours) }
     /// A chart of near-zero rain is noise: show it only for risky hours or at least 1 mm somewhere.
@@ -307,7 +318,7 @@ private struct ForecastCard: View {
             Chart {
                 ForEach(windows, id: \.start) { w in
                     RectangleMark(xStart: .value("Desde", w.start), xEnd: .value("Hasta", w.end))
-                        .foregroundStyle(.orange.opacity(0.18))
+                        .foregroundStyle(level.tint.opacity(0.25))
                 }
                 ForEach(hours) { h in
                     BarMark(x: .value("Hora", h.date, unit: .hour), y: .value("Lluvia (mm)", h.precipitation))
@@ -325,17 +336,26 @@ private struct ForecastCard: View {
             .frame(height: 90)
             .accessibilityLabel("Lluvia por hora en las próximas 24 horas")
 
+            // Only the swatches carry colour; the words stay readable secondary text.
             HStack(spacing: 12) {
-                Label("Lluvia (mm)", systemImage: "square.fill").foregroundStyle(.blue)
-                Label("Más cuidado", systemImage: "square.fill").foregroundStyle(.orange.opacity(0.5))
+                swatch(.blue, "Lluvia (mm)")
+                swatch(level.tint.opacity(0.5), "Más cuidado")
+                Spacer(minLength: 0)
                 if let gust = hours.map(\.gust).max(), gust >= 40 {
-                    Label("\(Int(gust)) km/h", systemImage: "wind").help("Ráfaga máxima")
+                    Label("Ráfagas \(Int(gust)) km/h", systemImage: "wind").fixedSize()
                 }
             }
             .font(.caption)
             .foregroundStyle(.secondary)
         }
         .card()
+    }
+
+    private func swatch(_ color: Color, _ text: String) -> some View {
+        HStack(spacing: 4) {
+            RoundedRectangle(cornerRadius: 2).fill(color).frame(width: 9, height: 9)
+            Text(text)
+        }
     }
 
     private var summary: String {
