@@ -14,6 +14,8 @@ public struct AlertGroup: Identifiable, Sendable {
     public var worst: CAPAlert { mostSevere(alerts)! }
     public var isShortTerm: Bool { worst.isShortTerm }
     public var mentionsHail: Bool { alerts.contains(where: \.mentionsHail) }
+    /// Level in force now: the first step of the timeline (expired alerts are already filtered out).
+    public var current: AlertLevel { timeline.first?.level ?? worst.level }
 
     /// Levels in time order, consecutive repeats merged: [amarilla hasta 20:59, naranja hasta 02:59].
     public var timeline: [Step] {

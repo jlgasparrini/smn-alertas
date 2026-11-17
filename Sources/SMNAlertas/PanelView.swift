@@ -138,29 +138,38 @@ struct PanelView: View {
     }
 }
 
-/// One phenomenon in two lines; description and recommendations stay folded under "Detalles".
+/// One phenomenon: tinted with the level in force, a bar when the level changes over time,
+/// description and recommendations folded under "Detalles".
 private struct AlertRow: View {
     let group: AlertGroup
     @State private var showDetails = false
 
     private var worst: CAPAlert { group.worst }
+    private var tint: Color { group.current.tint }
+    private var showsBar: Bool { group.timeline.count > 1 && !group.isShortTerm }
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: worst.symbolName)
-                .font(.title3)
-                .foregroundStyle(Color(nsColor: worst.level.color))
-                .frame(width: 24)
-            VStack(alignment: .leading, spacing: 3) {
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(group.current.onTint)
+                .frame(width: 30, height: 30)
+                .background(tint, in: Circle())
+            VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline) {
                     Text(worst.displayEvent).font(.headline)
                     Spacer()
-                    LevelBadge(alert: worst)
+                    if !showsBar {          // the bar's first segment already names the current level
+                        LevelBadge(text: group.isShortTerm ? "Ahora" : group.current.name().capitalized, level: group.current)
+                    }
                 }
-                Text(timeline).font(.subheadline).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                if showsBar {
+                    TimelineBar(steps: group.timeline).padding(.vertical, 2).accessibilityLabel(timeline)
+                } else {
+                    Text(timeline).font(.subheadline).foregroundStyle(Self.onCard)
+                }
                 if group.mentionsHail {
-                    Label("Posible granizo", systemImage: "cloud.hail").font(.caption).foregroundStyle(.secondary)
+                    Label("Posible granizo", systemImage: "cloud.hail").font(.caption).foregroundStyle(Self.onCard)
                 }
                 DisclosureGroup("Detalles", isExpanded: $showDetails) {
                     VStack(alignment: .leading, spacing: 6) {
@@ -180,13 +189,18 @@ private struct AlertRow: View {
                 .font(.caption)
             }
         }
-        .card()
+        .card(tint: tint)
     }
 
-    /// "Amarilla hasta 20:59 · luego naranja hasta mar 17, 02:59" or, for notices, "Ahora · hasta las 21:30".
+    /// Secondary text on the tinted card: grey would lose contrast against the level colour.
+    static let onCard = Color.primary.opacity(0.75)
+
+    /// Also the VoiceOver reading of the bar: "Amarilla hasta las 20:59 · luego naranja hasta el mar 02:59".
     private var timeline: String {
         if group.isShortTerm { return "Está ocurriendo · " + until(group.alerts.last?.expires) }
-        return group.timeline.enumerated().map { i, step in
+        let steps = group.timeline
+        if steps.count == 1 { return until(steps[0].until).capitalizedFirst }       // the badge already names the level
+        return steps.enumerated().map { i, step in
             let level = step.level.name()
             return (i == 0 ? level.capitalized : "luego " + level) + " " + until(step.until)
         }.joined(separator: " · ")
@@ -199,17 +213,74 @@ private struct AlertRow: View {
     }
 }
 
-private struct LevelBadge: View {
-    let alert: CAPAlert
+/// Levels from now on as coloured segments sized by duration, named inside when they fit,
+/// with the change times underneath.
+private struct TimelineBar: View {
+    let steps: [AlertGroup.Step]
 
     var body: some View {
-        Text(alert.isShortTerm ? "Ahora" : alert.level.name().capitalized)
+        TimelineView(.periodic(from: .now, by: 60)) { context in
+            let now = context.date
+            let ends = steps.map { $0.until ?? now.addingTimeInterval(3600) }
+            let total = max(ends.last!.timeIntervalSince(now), 60)
+            GeometryReader { geo in
+                let w = geo.size.width
+                let x = { (d: Date) in w * min(max(d.timeIntervalSince(now) / total, 0), 1) }
+                ZStack(alignment: .topLeading) {
+                    ForEach(steps.indices, id: \.self) { i in
+                        let from = i == 0 ? 0 : x(ends[i - 1]) + 1
+                        let to = i == steps.count - 1 ? w : x(ends[i]) - 1
+                        ViewThatFits {
+                            Text(steps[i].level.name().capitalized)
+                            Color.clear.frame(width: 0)
+                        }
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(steps[i].level.onTint)
+                        .frame(width: max(to - from, 4), height: 18)
+                        .background(steps[i].level.tint, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+                        .offset(x: from)
+                    }
+                    // shortcut: labels closer than ~50 pt overlap; fine for SMN slots, which last hours.
+                    ForEach(ends.indices.dropLast(), id: \.self) { i in
+                        Text(time(ends[i])).position(x: min(max(x(ends[i]), 24), w - 24), y: 29)
+                    }
+                    Text("Ahora").position(x: 16, y: 29)
+                    Text(time(ends.last!)).fixedSize().frame(width: w, alignment: .trailing).position(x: w / 2, y: 29)
+                }
+                .font(.caption2.monospacedDigit())
+                .foregroundStyle(AlertRow.onCard)
+            }
+        }
+        .frame(height: 36)
+    }
+
+    private func time(_ d: Date) -> String {
+        formatted(d, Calendar.current.isDate(d, inSameDayAs: .now) ? "HH:mm" : "EEE HH:mm")
+    }
+}
+
+private struct LevelBadge: View {
+    let text: String
+    let level: AlertLevel
+
+    var body: some View {
+        Text(text)
             .font(.caption2.weight(.semibold))
             .padding(.horizontal, 7)
             .padding(.vertical, 2)
-            .foregroundStyle(alert.level == .yellow ? Color.black : Color.white)
-            .background(Color(nsColor: alert.level.color), in: Capsule())
+            .foregroundStyle(level.onTint)
+            .background(level.tint, in: Capsule())
     }
+}
+
+extension AlertLevel {
+    var tint: Color { Color(nsColor: color) }
+    /// Text and glyphs on a level-coloured fill: dark on yellow, white otherwise.
+    var onTint: Color { self == .yellow ? .black : .white }
+}
+
+private extension String {
+    var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
 }
 
 private struct ForecastCard: View {
@@ -274,11 +345,13 @@ private struct ForecastCard: View {
 }
 
 extension View {
-    /// Rounded, subtly filled container used for every block in the panel.
-    func card() -> some View {
-        padding(10)
+    /// Rounded, subtly filled container used for every block in the panel; alerts pass their level colour.
+    func card(tint: Color? = nil) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
+        return padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.primary.opacity(0.055), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .background(tint.map { $0.opacity(0.13) } ?? Color.primary.opacity(0.055), in: shape)
+            .overlay(shape.strokeBorder(tint?.opacity(0.35) ?? .clear, lineWidth: 1))
     }
 }
 

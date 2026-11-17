@@ -19,6 +19,7 @@ struct AlertGroupTests {
         let g = try #require(groups.first)
         #expect(groups.count == 1)
         #expect(g.worst.level == .orange)
+        #expect(g.current == .yellow)
         #expect(g.timeline == [.init(level: .yellow, until: t0.addingTimeInterval(3600)),
                                .init(level: .orange, until: t0.addingTimeInterval(6 * 3600))])
     }
