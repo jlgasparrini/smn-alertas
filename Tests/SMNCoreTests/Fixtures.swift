@@ -2,6 +2,7 @@ import Foundation
 @testable import SMNCore
 
 let riocuarto = Coordinate(lat: -33.13, lon: -64.35)
+let rc = City(name: "Río Cuarto, Córdoba", coordinate: riocuarto)
 
 /// A square polygon of ±0.5° around `center`, as CAP writes it ("lat,lon lat,lon ...").
 func square(around c: Coordinate) -> String {

@@ -3,12 +3,13 @@ import ServiceManagement
 import SMNCore
 import SwiftUI
 
-/// Settings window: location search, alert behaviour and login item.
+/// Settings window: cities, alert behaviour and login item.
 struct SettingsView: View {
     @EnvironmentObject private var model: AppModel
     @AppStorage(Preferences.Key.soundEnabled) private var soundEnabled = true
     @AppStorage(Preferences.Key.repeatUntilSeen) private var repeatUntilSeen = true
     @AppStorage(Preferences.Key.quietYellowAtNight) private var quietYellowAtNight = false
+    @AppStorage(Preferences.Key.minimumLevel) private var minimumLevel = AlertLevel.yellow.rawValue
 
     @State private var query = ""
     @State private var results: [City] = []
@@ -18,28 +19,54 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section("Ubicación") {
-                LabeledContent("Ciudad", value: model.city?.name ?? "Sin elegir")
-                TextField("Buscar", text: $query, prompt: Text("Escribí tu ciudad, por ejemplo Río Cuarto"))
-                    .textFieldStyle(.roundedBorder)
+            Section {
+                ForEach(model.cities) { city in
+                    HStack {
+                        Label(city.name, systemImage: "mappin")
+                        Spacer()
+                        Button { model.removeCity(city) } label: { Image(systemName: "minus.circle.fill") }
+                            .buttonStyle(.borderless)
+                            .foregroundStyle(.secondary)
+                            .help("Quitar \(city.name)")
+                            .accessibilityLabel("Quitar \(city.name)")
+                    }
+                }
+                TextField(model.cities.isEmpty ? "Ciudad" : "Agregar", text: $query,
+                          prompt: Text("Buscá una ciudad, por ejemplo Río Cuarto"))
                 ForEach(results) { city in
+                    let added = model.cities.contains { $0.name == city.name }
                     Button { choose(city) } label: {
                         HStack {
                             Text(city.name)
                             Spacer()
-                            if city == model.city { Image(systemName: "checkmark").foregroundStyle(.tint) }
+                            Image(systemName: added ? "checkmark" : "plus.circle").foregroundStyle(.tint)
                         }
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .disabled(added)
                 }
                 if searchFailed {
                     Text("No encontré esa ciudad en Argentina.").foregroundStyle(.secondary)
                 }
+
+            } header: {
+                Text("Ciudades")
+            } footer: {
+                if model.cities.count > 1 {
+                    Text("Te avisa si una alerta afecta a cualquiera de ellas; la notificación dice cuál.")
+                }
             }
-            .task(id: query) { await search() }
 
             Section("Avisos") {
+                Picker(selection: $minimumLevel) {
+                    ForEach(AlertLevel.allCases, id: \.rawValue) { level in
+                        Text(level == .yellow ? "Todas las alertas" : "Desde \(level.name())").tag(level.rawValue)
+                    }
+                } label: {
+                    Text("Avisarme")
+                    Text("Las de menor nivel se ven en el panel, pero no notifican ni suenan.")
+                }
                 Toggle("Sonido al llegar una alerta", isOn: $soundEnabled)
                     .onChange(of: soundEnabled) { on in if on { model.notifier.playSound(for: .yellow) } }
                 Toggle("Repetir el sonido hasta que abras el panel", isOn: $repeatUntilSeen)
@@ -67,6 +94,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .task(id: query) { await search() }
         .frame(width: 440)
         .fixedSize(horizontal: false, vertical: true)
         .environment(\.locale, Locale(identifier: "es_AR"))
@@ -88,7 +116,7 @@ struct SettingsView: View {
     private func choose(_ city: City) {
         query = ""
         results = []
-        Task { await model.setCity(city) }
+        Task { await model.addCity(city) }
     }
 
     private func setLaunchAtLogin(_ on: Bool) {

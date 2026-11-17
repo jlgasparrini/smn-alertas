@@ -53,14 +53,33 @@ final class AlertNotifier: NSObject, UNUserNotificationCenterDelegate {
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=local.smnalertas")!)
     }
 
-    func post(_ alert: CAPAlert, body: String) {
+    /// `city` is named only when the user follows more than one.
+    func post(_ alert: CAPAlert, city: String?, body: String) {
+        send(id: alert.identifier, title: "\(alert.level.emoji) \(alert.levelLabel): \(alert.displayEvent)",
+             subtitle: [city, validity(of: alert)].compactMap { $0 }.joined(separator: " · "), body: body)
+    }
+
+    /// "🟠 Tormentas: pasa a naranja a las 02:10".
+    func postEscalation(event: String, to level: AlertLevel, at date: Date, city: String?) {
+        let minutes = max(1, Int(date.timeIntervalSinceNow / 60))
+        send(id: "escalation-\(event)-\(level.rawValue)-\(Int(date.timeIntervalSince1970))",
+             title: "\(level.emoji) \(event): pasa a \(level.name(feminine: true)) a las \(formatted(date, "HH:mm"))",
+             subtitle: city ?? "", body: "Faltan \(minutes) min. Prepará lo que necesites antes.")
+    }
+
+    func postEnded(event: String, city: String?) {
+        send(id: "ended-\(event)-\(Date().timeIntervalSince1970)", title: "✅ \(event): terminó la alerta",
+             subtitle: city ?? "", body: "El SMN ya no tiene alertas vigentes por este fenómeno en tu zona.", actions: false)
+    }
+
+    private func send(id: String, title: String, subtitle: String, body: String, actions: Bool = true) {
         let content = UNMutableNotificationContent()
-        content.title = "\(alert.level.emoji) \(alert.levelLabel): \(alert.displayEvent)"
-        content.subtitle = validity(of: alert)
+        content.title = title
+        content.subtitle = subtitle
         content.body = body
-        content.categoryIdentifier = Self.category
+        if actions { content.categoryIdentifier = Self.category }      // "Silenciar" means nothing for good news
         content.sound = nil        // the app plays its own per-level sound; avoid a double chime
-        center.add(UNNotificationRequest(identifier: alert.identifier, content: content, trigger: nil))
+        center.add(UNNotificationRequest(identifier: id, content: content, trigger: nil))
     }
 
     /// Yellow: one soft ping. Orange: one louder chime. Red: three chimes.

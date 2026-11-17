@@ -8,6 +8,8 @@ enum Preferences {
         static let soundEnabled = "soundEnabled"
         static let repeatUntilSeen = "repeatUntilSeen"
         static let quietYellowAtNight = "quietYellowAtNight"
+        static let minimumLevel = "minimumLevel"
+        static let cities = "cities"
     }
 
     private static var defaults: UserDefaults { .standard }
@@ -18,26 +20,29 @@ enum Preferences {
             defaults.set(!defaults.bool(forKey: "soundOff"), forKey: Key.soundEnabled)
             defaults.removeObject(forKey: "soundOff")
         }
-        defaults.register(defaults: [Key.soundEnabled: true, Key.repeatUntilSeen: true, Key.quietYellowAtNight: false])
+        defaults.register(defaults: [Key.soundEnabled: true, Key.repeatUntilSeen: true, Key.quietYellowAtNight: false,
+                                      Key.minimumLevel: AlertLevel.yellow.rawValue])
     }
 
-    /// Keys kept from 1.0 so existing installs keep their city.
-    static var city: City? {
+    /// The user's cities, in the order they added them. 1.x stored a single city in separate keys.
+    static var cities: [City] {
         get {
-            guard let name = defaults.string(forKey: "cityName") else { return nil }
-            return City(name: name, coordinate: Coordinate(lat: defaults.double(forKey: "lat"),
-                                                           lon: defaults.double(forKey: "lon")))
+            if let data = defaults.data(forKey: Key.cities), let cities = try? JSONDecoder().decode([City].self, from: data) {
+                return cities
+            }
+            guard let name = defaults.string(forKey: "cityName") else { return [] }
+            return [City(name: name, coordinate: Coordinate(lat: defaults.double(forKey: "lat"), lon: defaults.double(forKey: "lon")))]
         }
         set {
-            defaults.set(newValue?.name, forKey: "cityName")
-            defaults.set(newValue?.coordinate.lat, forKey: "lat")
-            defaults.set(newValue?.coordinate.lon, forKey: "lon")
+            defaults.set(try? JSONEncoder().encode(newValue), forKey: Key.cities)
+            for key in ["cityName", "lat", "lon"] { defaults.removeObject(forKey: key) }
         }
     }
 
     static var alarmPolicy: AlarmPolicy {
         AlarmPolicy(soundEnabled: defaults.bool(forKey: Key.soundEnabled),
                     repeatUntilSeen: defaults.bool(forKey: Key.repeatUntilSeen),
-                    quietYellowAtNight: defaults.bool(forKey: Key.quietYellowAtNight))
+                    quietYellowAtNight: defaults.bool(forKey: Key.quietYellowAtNight),
+                    minimumLevel: AlertLevel(rawValue: defaults.integer(forKey: Key.minimumLevel)) ?? .yellow)
     }
 }

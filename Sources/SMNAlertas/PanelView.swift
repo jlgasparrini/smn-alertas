@@ -7,7 +7,9 @@ struct PanelView: View {
     @EnvironmentObject private var model: AppModel
     @State private var contentHeight: CGFloat = 0
 
-    private var groups: [AlertGroup] { groupAlerts(model.alerts) }
+    private var places: [PlaceStatus] { model.places }
+    private var several: Bool { places.count > 1 }
+    private var alertCount: Int { places.map { groupAlerts($0.alerts).count }.reduce(0, +) }
 
     /// The popover must never run off the screen: the middle section scrolls past this height.
     private var maxContentHeight: CGFloat {
@@ -33,13 +35,22 @@ struct PanelView: View {
     private var content: some View {
         VStack(alignment: .leading, spacing: 8) {
             if !model.notificationsAllowed { notificationsOff }
-            if model.city == nil {
+            if model.cities.isEmpty {
                 noCity
-            } else if groups.isEmpty {
-                calm
             } else {
-                ForEach(groups) { AlertRow(group: $0) }
-                if !model.hours.isEmpty { ForecastCard(hours: model.hours, level: groups.map(\.worst.level).max() ?? .yellow) }
+                ForEach(places.filter { !$0.alerts.isEmpty }) { place in
+                    let groups = groupAlerts(place.alerts)
+                    if several {
+                        Text(place.city.name).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+                            .padding(.top, 4)
+                    }
+                    ForEach(groups) { AlertRow(group: $0) }
+                    if !place.hours.isEmpty {
+                        ForecastCard(hours: place.hours, level: groups.map(\.worst.level).max() ?? .yellow)
+                    }
+                }
+                let calmCities = places.filter(\.alerts.isEmpty).map(\.city)
+                if alertCount == 0 || !calmCities.isEmpty { calm(calmCities) }
             }
         }
     }
@@ -47,10 +58,12 @@ struct PanelView: View {
     private var header: some View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 1) {
-                Label(model.city?.name ?? "SMN Alertas", systemImage: "location.fill")
+                // A pin, not the GPS arrow: the cities are chosen by hand.
+                Label(several ? "SMN Alertas" : model.cities.first?.name ?? "SMN Alertas",
+                      systemImage: several ? "mappin.and.ellipse" : "mappin")
                     .font(.headline)
                     .labelStyle(.titleAndIcon)
-                Text(subtitle).font(.subheadline).foregroundStyle(.secondary)
+                if let subtitle { Text(subtitle).font(.subheadline).foregroundStyle(.secondary) }
             }
             Spacer()
             Button { Task { await model.refresh() } } label: {
@@ -89,12 +102,14 @@ struct PanelView: View {
         }
     }
 
-    private var subtitle: String {
+    /// Nil when there's nothing to add: the calm card already says "no alerts".
+    private var subtitle: String? {
         if model.isDemo { return "Estado de prueba" }
-        switch groups.count {
-        case 0: return "Sin alertas para tu zona"
-        case 1: return "1 alerta para tu zona"
-        default: return "\(groups.count) alertas para tu zona"
+        let zone = several ? "en \(places.count) ciudades" : "para tu zona"
+        switch alertCount {
+        case 0: return several ? "\(places.count) ciudades" : nil
+        case 1: return "1 alerta \(zone)"
+        default: return "\(alertCount) alertas \(zone)"
         }
     }
 
@@ -116,8 +131,13 @@ struct PanelView: View {
         .card()
     }
 
-    private var calm: some View {
-        Label("No hay alertas del SMN para tu zona.", systemImage: "checkmark.circle.fill")
+    /// "Sin alertas en Córdoba y Mendoza." when other cities do have alerts.
+    private func calm(_ cities: [City]) -> some View {
+        let short = cities.map { $0.name.components(separatedBy: ",")[0] }
+        let text = !several ? "No hay alertas del SMN para tu zona."
+            : alertCount == 0 ? "No hay alertas del SMN en tus ciudades."
+            : "Sin alertas en " + ListFormatter.localizedString(byJoining: short) + "."
+        return Label(text, systemImage: "checkmark.circle.fill")
             .symbolRenderingMode(.multicolor)
             .font(.callout)
             .frame(maxWidth: .infinity, alignment: .leading)

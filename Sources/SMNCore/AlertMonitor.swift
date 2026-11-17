@@ -4,14 +4,13 @@ import os
 
 private let log = Logger(subsystem: "local.smnalertas", category: "monitor")
 
-/// Polls the SMN CAP feed and tracks which alerts cover a location.
+/// Polls the SMN CAP feed and tracks which alerts cover each of the user's cities.
 /// Network, disk and clock are injected so the whole flow can be tested without the real SMN.
 @MainActor
 public final class AlertMonitor: ObservableObject {
     public static let feedURL = URL(string: "https://ssl.smn.gob.ar/CAP/AR.php")!
 
-    @Published public private(set) var active: [CAPAlert] = []
-    @Published public private(set) var forecast: HourlyForecast?
+    @Published public private(set) var places: [Place] = []
     @Published public private(set) var pendingZones = 0
     @Published public private(set) var lastCheck: Date?
     @Published public private(set) var lastError: String?
@@ -26,7 +25,8 @@ public final class AlertMonitor: ObservableObject {
     @Published public private(set) var isChecking = false
 
     private enum Key {
-        static let notified = "notifiedLevels"     // [event key: AlertLevel.rawValue]
+        static let notified = "notifiedLevels"     // [city|event key: AlertLevel.rawValue]
+        static let escalations = "escalationsSent"
         static let region = "region"
     }
 
@@ -41,9 +41,12 @@ public final class AlertMonitor: ObservableObject {
         self.now = now
     }
 
-    /// Refreshes `active` for `location` and returns the alerts that deserve a new notification.
+    /// Every alert in force for any of the cities.
+    public var alerts: [CAPAlert] { places.flatMap(\.alerts) }
+
+    /// Refreshes `places` for `cities` and returns what deserves a notification.
     @discardableResult
-    public func check(at location: Coordinate) async -> [CAPAlert] {
+    public func check(_ cities: [City]) async -> [Notice] {
         guard !isChecking else { return [] }       // wake, timer and manual refresh can overlap
         isChecking = true
         defer { isChecking = false; lastCheck = now() }
@@ -54,19 +57,23 @@ public final class AlertMonitor: ObservableObject {
 
             let current = now()
             var seen = Set<String>()
-            active = links.compactMap { cache[$0] ?? nil }
-                .filter { $0.isActive(at: current) && $0.contains(location) && seen.insert($0.identifier).inserted }
+            let inForce = links.compactMap { cache[$0] ?? nil }
+                .filter { $0.isActive(at: current) && seen.insert($0.identifier).inserted }
                 .sorted { ($0.expires ?? .distantFuture) < ($1.expires ?? .distantFuture) }
-            if let region = active.lazy.compactMap({ $0.url.flatMap(capRegion) }).first {
+            var found = cities.map { city in Place(city: city, alerts: inForce.filter { $0.contains(city.coordinate) }) }
+            if let region = found.lazy.flatMap(\.alerts).compactMap({ $0.url.flatMap(capRegion) }).first {
                 defaults.set(region, forKey: Key.region)
             }
             // The forecast only enriches the report: a failure must never hold back an SMN alert.
-            forecast = active.isEmpty ? nil
-                : try? JSONDecoder().decode(HourlyForecast.self, from: await http.data(from: HourlyForecast.url(for: location)))
+            for i in found.indices where !found[i].alerts.isEmpty {
+                found[i].forecast = try? JSONDecoder().decode(
+                    HourlyForecast.self, from: await http.data(from: HourlyForecast.url(for: found[i].city.coordinate)))
+            }
+            places = found
             lastError = nil
-            let notify = updateNotificationState()
-            log.notice("check: \(links.count) zones, \(self.pendingZones) pending, \(self.active.count) active, \(notify.count) new")
-            return notify
+            let notices = updateNotificationState(cities: cities, at: current)
+            log.notice("check: \(links.count) zones, \(self.pendingZones) pending, \(self.alerts.count) active, \(notices.count) new")
+            return notices
         } catch {
             lastError = error.localizedDescription
             log.error("check failed: \(error.localizedDescription, privacy: .public)")
@@ -101,13 +108,19 @@ public final class AlertMonitor: ObservableObject {
         pendingZones = links.filter { cache[$0] == nil }.count
     }
 
-    private func updateNotificationState() -> [CAPAlert] {
+    private func updateNotificationState(cities: [City], at date: Date) -> [Notice] {
         let saved = defaults.dictionary(forKey: Key.notified) as? [String: Int] ?? [:]
-        let previous = saved.compactMapValues(AlertLevel.init(rawValue:))
-        var (notify, state) = alertsToNotify(active: active, previous: previous)
-        // While zones are still pending, a missing alert may just not be downloaded yet: keep its state.
-        if pendingZones > 0 { state.merge(previous) { current, _ in current } }
-        defaults.set(state.mapValues(\.rawValue), forKey: Key.notified)
-        return notify
+        var levels: [String: AlertLevel] = [:]
+        for (key, raw) in saved {
+            guard let level = AlertLevel(rawValue: raw) else { continue }
+            // 1.x keys had no city: they belong to the only city there was.
+            let full = key.contains("|") ? key : cities.first.map { "\($0.name)|\(key)" }
+            if let full { levels[full] = level }
+        }
+        let previous = NoticeState(levels: levels, escalations: Set(defaults.stringArray(forKey: Key.escalations) ?? []))
+        let (notices, state) = planNotices(places: places, previous: previous, now: date, partial: pendingZones > 0)
+        defaults.set(state.levels.mapValues(\.rawValue), forKey: Key.notified)
+        defaults.set(Array(state.escalations), forKey: Key.escalations)
+        return notices
     }
 }

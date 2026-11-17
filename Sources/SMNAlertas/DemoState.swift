@@ -13,6 +13,8 @@ struct DemoState {
     var description = ""
     /// Reproduce the real 2026-11-16 case: one storm as two identical yellow files plus an orange one later.
     var splitLikeSMN = false
+    /// Adds a second, calm city to show the panel with several cities.
+    var otherCity = false
     var instruction = "1- Evitá salir. 2- Retirá objetos que puedan volarse. 3- Desconectá los electrodomésticos si ingresa agua."
 
     static let all: [DemoState] = [
@@ -30,6 +32,8 @@ struct DemoState {
         DemoState(title: "🟡→🟠 Tormenta en varios tramos (caso real)", event: "Tormentas", severity: "Moderate",
                   description: "El área será afectada por tormentas, algunas fuertes o puntualmente severas. Las mismas podrán estar acompañadas por fuertes precipitaciones en cortos períodos, frecuente actividad eléctrica, ocasional granizo y ráfagas intensas. Se esperan valores de precipitación acumulada entre 30 y 70 mm, que pueden ser superados en forma puntual.",
                   splitLikeSMN: true),
+        DemoState(title: "🏙️ Dos ciudades, alerta en una", event: "Viento Zonda", severity: "Severe",
+                  description: "Ráfagas de hasta 90 km/h.", otherCity: true),
         DemoState(title: "⚠️ Aviso naranja a corto plazo (granizo)", event: "TORMENTAS FUERTES", severity: "Severe",
                   headline: "AVISO NARANJA POR TORMENTAS FUERTES CON CAIDA DE GRANIZO", shortTerm: true,
                   description: "TORMENTAS FUERTES CON CAIDA DE GRANIZO",

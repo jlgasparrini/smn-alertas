@@ -26,21 +26,21 @@ struct AlertMonitorTests {
     @Test func findsAlertForLocationAndNotifiesOnce() async {
         _ = await publish(3)
         let m = monitor()
-        let first = await m.check(at: riocuarto)
-        #expect(first.map(\.id) == ["id-0"])
-        #expect(m.active.map(\.id) == ["id-0"])
+        let first = await m.check([rc])
+        #expect(first.compactMap(\.alert?.id) == ["id-0"])
+        #expect(m.alerts.map(\.id) == ["id-0"])
         #expect(m.lastError == nil)
 
-        let second = await m.check(at: riocuarto)
+        let second = await m.check([rc])
         #expect(second.isEmpty)
-        #expect(m.active.count == 1)
+        #expect(m.alerts.count == 1)
     }
 
     @Test func forecastFailureDoesNotBlockTheAlert() async {
         _ = await publish(1)                            // FakeHTTP fails Open-Meteo with 503
         let m = monitor()
-        #expect(await m.check(at: riocuarto).count == 1)
-        #expect(m.forecast == nil)
+        #expect(await m.check([rc]).count == 1)
+        #expect(m.places.first?.forecast == nil)
         #expect(m.lastError == nil)
     }
 
@@ -52,55 +52,55 @@ struct AlertMonitorTests {
         await http.set(AlertMonitor.feedURL, rss(urls))
 
         let m = monitor(maxDownloads: 2)
-        let fresh = await m.check(at: riocuarto)
+        let fresh = await m.check([rc])
         let capRequests = await http.requests.filter { $0.path.contains("/feeds/CAP/") }
         #expect(capRequests.count == 2)
         #expect(capRequests.contains(notice))
         #expect(m.pendingZones == 4)
-        #expect(fresh.map(\.id).contains("acp"))
+        #expect(fresh.compactMap(\.alert?.id).contains("acp"))
     }
 
     @Test func failedDownloadsAreRetriedNotCached() async {
         let urls = await publish(1)
         await http.fail(urls[0])
         let m = monitor()
-        #expect(await m.check(at: riocuarto).isEmpty)
+        #expect(await m.check([rc]).isEmpty)
         #expect(m.pendingZones == 1)
 
         await http.heal(urls[0])
-        #expect(await m.check(at: riocuarto).count == 1)
+        #expect(await m.check([rc]).count == 1)
         #expect(m.pendingZones == 0)
     }
 
     @Test func keepsNotificationStateWhileZonesArePending() async {
         _ = await publish(1)
-        #expect(await monitor().check(at: riocuarto).count == 1)
+        #expect(await monitor().check([rc]).count == 1)
 
         // Restart while SMN rate-limits: our zone isn't loaded yet, so it must not count as "ended".
         let urls = (0..<3).map { capURL("\($0)") }
         await http.set(AlertMonitor.feedURL, rss(urls))
         for url in urls { await http.fail(url) }
         let restarted = AlertMonitor(http: http, store: MemoryStore(), defaults: defaults)
-        #expect(await restarted.check(at: riocuarto).isEmpty)
+        #expect(await restarted.check([rc]).isEmpty)
 
         for url in urls { await http.heal(url) }
         await http.set(urls[0], capXML(id: "id-0-update"))           // same event, new identifier
         await http.set(urls[1], capXML(id: "x", around: Coordinate(lat: -50, lon: -70)))
         await http.set(urls[2], capXML(id: "y", around: Coordinate(lat: -50, lon: -70)))
-        #expect(await restarted.check(at: riocuarto).isEmpty)        // no duplicate notification
+        #expect(await restarted.check([rc]).isEmpty)        // no duplicate notification
     }
 
     @Test func reusesStoredFilesAcrossLaunches() async {
         _ = await publish(4)
-        await monitor().check(at: riocuarto)
+        await monitor().check([rc])
         #expect(store.count == 4)
 
         await http.clearLog()
         let relaunched = monitor()
-        await relaunched.check(at: riocuarto)
+        await relaunched.check([rc])
         let capRequests = await http.requests.filter { $0.path.contains("/feeds/CAP/") }
         #expect(capRequests.isEmpty)
-        #expect(relaunched.active.count == 1)
+        #expect(relaunched.alerts.count == 1)
     }
 
     @Test func ignoresExpiredAlerts() async {
@@ -108,15 +108,15 @@ struct AlertMonitorTests {
         await http.set(url, capXML(id: "old", expires: "2020-01-01T00:00:00-03:00"))
         await http.set(AlertMonitor.feedURL, rss([url]))
         let m = monitor()
-        #expect(await m.check(at: riocuarto).isEmpty)
-        #expect(m.active.isEmpty)
+        #expect(await m.check([rc]).isEmpty)
+        #expect(m.alerts.isEmpty)
     }
 
     @Test func downloadsTheUsersRegionFirstOnceLearned() async {
         let mine = capURL("mine", region: "Patagonia")
         await http.set(mine, capXML(id: "mine"))
         await http.set(AlertMonitor.feedURL, rss([mine]))
-        await monitor().check(at: riocuarto)                  // learns "Patagonia"
+        await monitor().check([rc])                  // learns "Patagonia"
 
         // New batch: two other-region zones listed before ours, budget of one download.
         let others = [capURL("a", region: "Llanura"), capURL("b", region: "Cordillera")]
@@ -126,15 +126,15 @@ struct AlertMonitorTests {
         await http.set(AlertMonitor.feedURL, rss(others + [next]))
         await http.clearLog()
         let fresh = await AlertMonitor(http: http, store: MemoryStore(), defaults: defaults, maxDownloadsPerCheck: 1)
-            .check(at: riocuarto)
+            .check([rc])
         #expect(await http.requests.contains(next))
-        #expect(fresh.map(\.id) == ["mine2"])
+        #expect(fresh.compactMap(\.alert?.id) == ["mine2"])
     }
 
     @Test func reportsFeedErrors() async {
         await http.fail(AlertMonitor.feedURL)
         let m = monitor()
-        #expect(await m.check(at: riocuarto).isEmpty)
+        #expect(await m.check([rc]).isEmpty)
         #expect(m.lastError == FetchError.status(429).errorDescription)
         #expect(m.lastCheck != nil)
     }
@@ -152,5 +152,34 @@ struct GeocoderTests {
         let city = try #require(try await Geocoder(http: http).search("rio cuarto").first)
         #expect(city.name == "Río Cuarto, Córdoba")
         #expect(city.coordinate == Coordinate(lat: -33.13, lon: -64.35))
+    }
+}
+
+@Suite("AlertMonitor, several cities") @MainActor
+struct MultiCityMonitorTests {
+    let http = FakeHTTP()
+    let defaults = freshDefaults()
+    let far = City(name: "Ushuaia, Tierra del Fuego", coordinate: Coordinate(lat: -50, lon: -70))
+
+    @Test func splitsAlertsPerCityAndReportsTheEnd() async {
+        let urls = [capURL("0"), capURL("1")]
+        await http.set(urls[0], capXML(id: "rc"))
+        await http.set(urls[1], capXML(id: "far", event: "Viento", around: far.coordinate))
+        await http.set(AlertMonitor.feedURL, rss(urls))
+        let m = AlertMonitor(http: http, store: MemoryStore(), defaults: defaults)
+
+        let first = await m.check([rc, far])
+        #expect(m.places.map { $0.alerts.map(\.id) } == [["rc"], ["far"]])
+        #expect(Set(first.compactMap(\.alert?.id)) == ["rc", "far"])
+
+        await http.set(AlertMonitor.feedURL, rss([urls[1]]))       // Río Cuarto's alert is over
+        #expect(await m.check([rc, far]) == [.ended(event: "Tormentas", level: .yellow, city: rc)])
+    }
+
+    @Test func upgradeFromOneCityDoesNotRepeatOrEndAlerts() async {
+        defaults.set(["TORMENTAS": AlertLevel.yellow.rawValue], forKey: "notifiedLevels")    // 1.x state
+        await http.set(capURL("0"), capXML(id: "rc"))
+        await http.set(AlertMonitor.feedURL, rss([capURL("0")]))
+        #expect(await AlertMonitor(http: http, store: MemoryStore(), defaults: defaults).check([rc]).isEmpty)
     }
 }
