@@ -11,6 +11,8 @@ struct PanelView: View {
     private var several: Bool { places.count > 1 }
     private var alertCount: Int { places.map { groupAlerts($0.alerts).count }.reduce(0, +) }
 
+    private static let gutter: CGFloat = 14       // same as the panel padding
+
     /// The popover must never run off the screen: the middle section scrolls past this height.
     private var maxContentHeight: CGFloat {
         min(520, (NSScreen.main?.visibleFrame.height ?? 800) - 180)
@@ -19,11 +21,15 @@ struct PanelView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             header
+            // The scroll area reaches into the panel's right margin, so the scrollbar sits there
+            // instead of over the cards.
             ScrollView {
                 content
+                    .padding(.trailing, Self.gutter)
                     .background(GeometryReader { Color.clear.preference(key: HeightKey.self, value: $0.size.height) })
             }
             .frame(height: min(contentHeight, maxContentHeight))
+            .padding(.trailing, -Self.gutter)
             .onPreferenceChange(HeightKey.self) { contentHeight = $0 }
             footer
         }
