@@ -25,7 +25,7 @@ Además de la alerta nueva, avisa **una hora antes de que empeore** ("Tormentas:
 
 La notificación trae dos botones: **Ver detalles** abre el panel y **Silenciar** corta el parpadeo y el sonido sin abrirlo.
 
-Al tocar el ícono se abre un panel con una fila por fenómeno (por ejemplo "Amarilla hasta las 20:59 · luego naranja hasta el mar 02:59"), los detalles y recomendaciones del SMN plegados, y un gráfico de lluvia de las próximas 24 h con las horas de más cuidado. En **Ajustes** se elige la ciudad (con sugerencias), el sonido, el silencio nocturno de las amarillas y si la app abre al iniciar sesión.
+Junto al ícono se ve la temperatura de tu ciudad (se puede ocultar en Ajustes). Al tocar el ícono se abre un panel con el clima de ahora, que abre la app Tiempo de Apple si lo tocás, con una fila por fenómeno (por ejemplo "Amarilla hasta las 20:59 · luego naranja hasta el mar 02:59"), los detalles y recomendaciones del SMN plegados, y un gráfico de lluvia de las próximas 24 h con las horas de más cuidado. En **Ajustes** se elige la ciudad (con sugerencias), el sonido, el silencio nocturno de las amarillas y si la app abre al iniciar sesión.
 
 En el build de desarrollo, **Probar estados** (menú ··· del panel) simula cada caso. Mientras está activo no se consulta al SMN; para volver, elegí **Volver a los datos reales**.
 
@@ -34,8 +34,8 @@ En el build de desarrollo, **Probar estados** (menú ··· del panel) simula ca
 Necesita macOS 13 o superior y las Command Line Tools de Xcode (no hace falta Xcode).
 
 ```sh
-./build-app.sh 1.4.0          # producción: app universal + zip para la release
-./build-app.sh 1.4.0 --dev    # desarrollo: agrega "Probar estados" en el menú ··· del panel
+./build-app.sh 1.5.0          # producción: app universal + zip para la release
+./build-app.sh 1.5.0 --dev    # desarrollo: agrega "Probar estados" en el menú ··· del panel
 open "build/SMN Alertas.app"
 ```
 

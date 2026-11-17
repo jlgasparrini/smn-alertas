@@ -11,6 +11,7 @@ enum Preferences {
         static let minimumLevel = "minimumLevel"
         static let cities = "cities"
         static let appearance = "appearance"      // "system", "light" or "dark"
+        static let showTemperature = "showTemperature"
     }
 
     private static var defaults: UserDefaults { .standard }
@@ -22,7 +23,7 @@ enum Preferences {
             defaults.removeObject(forKey: "soundOff")
         }
         defaults.register(defaults: [Key.soundEnabled: true, Key.repeatUntilSeen: true, Key.quietYellowAtNight: false,
-                                      Key.minimumLevel: AlertLevel.yellow.rawValue])
+                                      Key.minimumLevel: AlertLevel.yellow.rawValue, Key.showTemperature: true])
     }
 
     /// The user's cities, in the order they added them. 1.x stored a single city in separate keys.
@@ -38,6 +39,11 @@ enum Preferences {
             defaults.set(try? JSONEncoder().encode(newValue), forKey: Key.cities)
             for key in ["cityName", "lat", "lon"] { defaults.removeObject(forKey: key) }
         }
+    }
+
+    static var showTemperature: Bool {
+        get { defaults.bool(forKey: Key.showTemperature) }
+        set { defaults.set(newValue, forKey: Key.showTemperature) }
     }
 
     /// Panel and Settings follow macOS unless the user fixed light or dark.

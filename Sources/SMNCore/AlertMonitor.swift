@@ -64,10 +64,13 @@ public final class AlertMonitor: ObservableObject {
             if let region = found.lazy.flatMap(\.alerts).compactMap({ $0.url.flatMap(capRegion) }).first {
                 defaults.set(region, forKey: Key.region)
             }
-            // The forecast only enriches the report: a failure must never hold back an SMN alert.
-            for i in found.indices where !found[i].alerts.isEmpty {
-                found[i].forecast = try? JSONDecoder().decode(
-                    HourlyForecast.self, from: await http.data(from: HourlyForecast.url(for: found[i].city.coordinate)))
+            // Weather only enriches the panel: a failure must never hold back an SMN alert.
+            for i in found.indices {
+                let c = found[i].city.coordinate
+                found[i].current = (try? JSONDecoder().decode(CurrentWeather.self, from: await http.data(from: CurrentWeather.url(for: c))))
+                    ?? places.first { $0.city == found[i].city }?.current          // keep the last reading on a blip
+                guard !found[i].alerts.isEmpty else { continue }
+                found[i].forecast = try? JSONDecoder().decode(HourlyForecast.self, from: await http.data(from: HourlyForecast.url(for: c)))
             }
             places = found
             lastError = nil

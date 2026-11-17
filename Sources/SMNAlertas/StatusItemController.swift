@@ -69,6 +69,10 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     }
 
     private func setIcon(dotVisible: Bool) {
-        item.button?.image = menuBarImage(for: mostSevere(model.alerts), dotVisible: dotVisible)
+        guard let button = item.button else { return }
+        button.image = menuBarImage(for: mostSevere(model.alerts), dotVisible: dotVisible)
+        let temperature = model.showTemperature ? model.places.first?.current?.temperatureText : nil
+        button.title = temperature ?? ""
+        button.imagePosition = temperature == nil ? .imageOnly : .imageLeading
     }
 }

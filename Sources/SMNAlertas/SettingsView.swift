@@ -100,6 +100,7 @@ struct SettingsView: View {
                     Text("Oscura").tag("dark")
                 }
                 .onChange(of: appearance) { _ in Preferences.applyAppearance() }
+                Toggle("Mostrar la temperatura en la barra de menú", isOn: $model.showTemperature)
                 Toggle("Abrir al iniciar sesión", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { setLaunchAtLogin($0) }
                 if let loginNote {

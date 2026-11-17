@@ -9,6 +9,7 @@ struct PlaceStatus: Identifiable {
     let alerts: [CAPAlert]
     /// Next 24 h of the hourly forecast (only fetched while an alert is active).
     let hours: [HourPoint]
+    let current: CurrentWeather?
     var id: String { city.id }
 }
 
@@ -29,6 +30,10 @@ final class AppModel: ObservableObject {
     #endif
     @Published private(set) var cities: [City] = Preferences.cities
     @Published private(set) var notificationsAllowed = true
+    /// Temperature of the first city next to the menu bar icon.
+    @Published var showTemperature = Preferences.showTemperature {
+        didSet { Preferences.showTemperature = showTemperature }
+    }
 
     /// Asks the menu bar to blink (and maybe sound) for a new alert.
     var onAlarm: (AlertLevel, AlarmPolicy.Reaction) -> Void = { _, _ in }
@@ -60,14 +65,19 @@ final class AppModel: ObservableObject {
         if let demo {
             let city = cities.first ?? City(name: "Río Cuarto, Córdoba", coordinate: Coordinate(lat: -33.13, lon: -64.35))
             let other = City(name: "Mendoza, Mendoza", coordinate: Coordinate(lat: -32.89, lon: -68.83))
-            return [PlaceStatus(city: city, alerts: demo.alerts, hours: demo.hours)]
-                + (demo.otherCity ? [PlaceStatus(city: other, alerts: [], hours: [])] : [])
+            let stormy = CurrentWeather(temperature: 23.4, weatherCode: demo.alerts.isEmpty ? 1 : 95, isDay: true,
+                                        todayMax: 29, todayMin: 16)
+            return [PlaceStatus(city: city, alerts: demo.alerts, hours: demo.hours, current: stormy)]
+                + (demo.otherCity ? [PlaceStatus(city: other, alerts: [], hours: [],
+                                                 current: CurrentWeather(temperature: 31, weatherCode: 0, isDay: true,
+                                                                         todayMax: 34, todayMin: 18))] : [])
         }
         #endif
         let now = Date()
         return monitor.places.map {
             PlaceStatus(city: $0.city, alerts: $0.alerts,
-                        hours: $0.forecast?.points(from: now, to: now.addingTimeInterval(24 * 3600)) ?? [])
+                        hours: $0.forecast?.points(from: now, to: now.addingTimeInterval(24 * 3600)) ?? [],
+                        current: $0.current)
         }
     }
 

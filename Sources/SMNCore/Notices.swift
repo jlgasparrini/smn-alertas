@@ -5,12 +5,14 @@ public struct Place: Identifiable, Sendable {
     public let city: City
     public var alerts: [CAPAlert]
     public var forecast: HourlyForecast?
+    public var current: CurrentWeather?
     public var id: String { city.id }
 
-    public init(city: City, alerts: [CAPAlert], forecast: HourlyForecast? = nil) {
+    public init(city: City, alerts: [CAPAlert], forecast: HourlyForecast? = nil, current: CurrentWeather? = nil) {
         self.city = city
         self.alerts = alerts
         self.forecast = forecast
+        self.current = current
     }
 }
 

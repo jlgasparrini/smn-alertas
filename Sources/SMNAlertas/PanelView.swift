@@ -41,31 +41,41 @@ struct PanelView: View {
                 ForEach(places.filter { !$0.alerts.isEmpty }) { place in
                     let groups = groupAlerts(place.alerts)
                     if several {
-                        Text(place.city.name).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
-                            .padding(.top, 4)
+                        HStack {
+                            Text(place.city.name).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+                            Spacer()
+                            if let current = place.current { CompactWeather(current: current) }
+                        }
+                        .padding(.top, 4)
                     }
                     ForEach(groups) { AlertRow(group: $0) }
                     if !place.hours.isEmpty {
                         ForecastCard(hours: place.hours, level: groups.map(\.worst.level).max() ?? .yellow)
                     }
                 }
-                let calmCities = places.filter(\.alerts.isEmpty).map(\.city)
-                if alertCount == 0 || !calmCities.isEmpty { calm(calmCities) }
+                let calmPlaces = places.filter(\.alerts.isEmpty)
+                if alertCount == 0 || !calmPlaces.isEmpty { calm(calmPlaces) }
             }
         }
     }
 
     private var header: some View {
-        HStack(alignment: .center) {
-            VStack(alignment: .leading, spacing: 1) {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .center) {
                 // A pin, not the GPS arrow: the cities are chosen by hand.
                 Label(several ? "SMN Alertas" : model.cities.first?.name ?? "SMN Alertas",
                       systemImage: several ? "mappin.and.ellipse" : "mappin")
                     .font(.headline)
                     .labelStyle(.titleAndIcon)
-                if let subtitle { Text(subtitle).font(.subheadline).foregroundStyle(.secondary) }
+                Spacer()
+                headerButtons
             }
-            Spacer()
+            if !several, let current = places.first?.current { WeatherNow(current: current) }
+            if let subtitle { Text(subtitle).font(.subheadline).foregroundStyle(.secondary) }
+        }
+    }
+
+    @ViewBuilder private var headerButtons: some View {
             Button { Task { await model.refresh() } } label: {
                 if model.monitor.isChecking {
                     ProgressView().controlSize(.small).accessibilityLabel("Consultando al SMN")
@@ -100,17 +110,17 @@ struct PanelView: View {
             .menuIndicator(.hidden)
             .fixedSize()
             .accessibilityLabel("Más opciones")
-        }
     }
 
     /// Nil when there's nothing to add: the calm card already says "no alerts".
     private var subtitle: String? {
         if model.isDemo { return "Estado de prueba" }
-        let zone = several ? "en \(places.count) ciudades" : "para tu zona"
+        // With one city the weather line takes this place; the cards already say how many alerts.
+        guard several else { return nil }
         switch alertCount {
-        case 0: return several ? "\(places.count) ciudades" : nil
-        case 1: return "1 alerta \(zone)"
-        default: return "\(alertCount) alertas \(zone)"
+        case 0: return "\(places.count) ciudades"
+        case 1: return "1 alerta en \(places.count) ciudades"
+        default: return "\(alertCount) alertas en \(places.count) ciudades"
         }
     }
 
@@ -132,17 +142,25 @@ struct PanelView: View {
         .card()
     }
 
-    /// "Sin alertas en Córdoba y Mendoza." when other cities do have alerts.
-    private func calm(_ cities: [City]) -> some View {
-        let short = cities.map { $0.name.components(separatedBy: ",")[0] }
-        let text = !several ? "No hay alertas del SMN para tu zona."
-            : alertCount == 0 ? "No hay alertas del SMN en tus ciudades."
-            : "Sin alertas en " + ListFormatter.localizedString(byJoining: short) + "."
-        return Label(text, systemImage: "checkmark.circle.fill")
-            .symbolRenderingMode(.multicolor)
-            .font(.callout)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .card()
+    /// One city: a single line. Several: "Sin alertas" and each calm city with its temperature.
+    private func calm(_ calmPlaces: [PlaceStatus]) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label(several ? "Sin alertas" : "No hay alertas del SMN para tu zona.", systemImage: "checkmark.circle.fill")
+                .symbolRenderingMode(.multicolor)
+            if several {
+                ForEach(calmPlaces) { place in
+                    HStack {
+                        Text(place.city.name)
+                        Spacer()
+                        if let current = place.current { CompactWeather(current: current) }
+                    }
+                    .padding(.leading, 26)
+                }
+            }
+        }
+        .font(.callout)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .card()
     }
 
     private var footer: some View {
@@ -165,6 +183,61 @@ struct PanelView: View {
         var text = "Actualizado " + f.localizedString(for: last, relativeTo: .now)
         if model.monitor.pendingZones > 0 { text += " · faltan \(model.monitor.pendingZones) zonas" }
         return text
+    }
+}
+
+/// "☁️ 24°  Parcialmente nublado · Máx 29° Mín 16°" under the city name. Clicking it opens Apple's
+/// Weather app: this app covers alerts, Weather covers everything else.
+private struct WeatherNow: View {
+    let current: CurrentWeather
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: openWeather) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Image(systemName: current.symbolName).symbolRenderingMode(.multicolor).font(.title3)
+                Text(current.temperatureText).font(.title2.weight(.semibold)).monospacedDigit()
+                Text(detail).font(.subheadline).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.85)
+                Image(systemName: "arrow.up.forward").font(.caption2.weight(.semibold)).foregroundStyle(.tertiary)
+                    .opacity(hovering ? 1 : 0)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help("Abrir en Tiempo")
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("Abre la app Tiempo")
+    }
+
+
+
+    private var detail: String {
+        guard let max = current.todayMax, let min = current.todayMin else { return current.summary }
+        return "\(current.summary) · Máx \(Int(max.rounded()))° Mín \(Int(min.rounded()))°"
+    }
+}
+
+@MainActor private func openWeather() {
+    guard let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.weather") else { return }
+    NSWorkspace.shared.openApplication(at: app, configuration: .init())
+}
+
+/// "☀️ 31°" next to a city name when there are several; also opens Weather.
+private struct CompactWeather: View {
+    let current: CurrentWeather
+
+    var body: some View {
+        Button(action: openWeather) {
+            HStack(spacing: 4) {
+                Image(systemName: current.symbolName).symbolRenderingMode(.multicolor)
+                Text(current.temperatureText).monospacedDigit()
+            }
+        }
+        .buttonStyle(.plain)
+        .font(.subheadline)
+        .help("\(current.summary) · Abrir en Tiempo")
+        .accessibilityLabel("\(current.temperatureText), \(current.summary)")
     }
 }
 

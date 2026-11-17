@@ -183,3 +183,22 @@ struct MultiCityMonitorTests {
         #expect(await AlertMonitor(http: http, store: MemoryStore(), defaults: defaults).check([rc]).isEmpty)
     }
 }
+
+@Suite("AlertMonitor, current weather") @MainActor
+struct CurrentWeatherMonitorTests {
+    @Test func fetchesWeatherForCalmCitiesAndKeepsItOnAFailedRefresh() async {
+        let http = FakeHTTP()
+        await http.set(capURL("far"), capXML(id: "far", around: Coordinate(lat: -50, lon: -70)))
+        await http.set(AlertMonitor.feedURL, rss([capURL("far")]))
+        let json = #"{"current":{"temperature_2m":21.2,"weather_code":0,"is_day":1},"daily":{"temperature_2m_max":[27],"temperature_2m_min":[12]}}"#
+        await http.set(CurrentWeather.url(for: riocuarto), Data(json.utf8))
+        let m = AlertMonitor(http: http, store: MemoryStore(), defaults: freshDefaults())
+        await m.check([rc])
+        #expect(m.places.first?.current?.temperatureText == "21°")
+        #expect(m.places.first?.forecast == nil)         // hourly forecast only while an alert is in force
+
+        await http.fail(CurrentWeather.url(for: riocuarto))
+        await m.check([rc])
+        #expect(m.places.first?.current?.temperatureText == "21°")
+    }
+}

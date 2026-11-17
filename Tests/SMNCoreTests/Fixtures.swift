@@ -44,7 +44,7 @@ actor FakeHTTP: HTTPClient {
         requests.append(url)
         if failing.contains(url) { throw FetchError.status(429) }
         if let d = responses[url] { return d }
-        if url.host == "api.open-meteo.com" { throw FetchError.status(503) }   // forecast is optional
+        if url.host == "api.open-meteo.com" { throw FetchError.status(503) }   // weather is optional
         throw FetchError.status(404)
     }
 }
