@@ -21,6 +21,8 @@ App de barra de menú para macOS que avisa cuando el Servicio Meteorológico Nac
 
 Cuando llega algo nuevo, el punto parpadea y suena un sonido cada 4 segundos hasta que abrís el menú: Ping (amarillo), Hero (naranja) o Sosumi ×3 (rojo). El sonido se corta solo a los 2 minutos y se puede apagar desde el menú. Suena aunque esté activado "No molestar".
 
+La notificación trae dos botones: **Ver detalles** abre el panel y **Silenciar** corta el parpadeo y el sonido sin abrirlo.
+
 Al tocar el ícono se abre un panel con una fila por fenómeno (por ejemplo "Amarilla hasta las 20:59 · luego naranja hasta el mar 02:59"), los detalles y recomendaciones del SMN plegados, y un gráfico de lluvia de las próximas 24 h con las horas de más cuidado. En **Ajustes** se elige la ciudad (con sugerencias), el sonido, el silencio nocturno de las amarillas y si la app abre al iniciar sesión.
 
 En el build de desarrollo, **Probar estados** (menú ··· del panel) simula cada caso. Mientras está activo no se consulta al SMN; para volver, elegí **Volver a los datos reales**.
@@ -30,8 +32,8 @@ En el build de desarrollo, **Probar estados** (menú ··· del panel) simula ca
 Necesita macOS 13 o superior y las Command Line Tools de Xcode (no hace falta Xcode).
 
 ```sh
-./build-app.sh 1.1.0          # producción: app universal + zip para la release
-./build-app.sh 1.1.0 --dev    # desarrollo: agrega "Probar estados" en el menú ··· del panel
+./build-app.sh 1.2.0          # producción: app universal + zip para la release
+./build-app.sh 1.2.0 --dev    # desarrollo: agrega "Probar estados" en el menú ··· del panel
 open "build/SMN Alertas.app"
 ```
 
@@ -39,7 +41,9 @@ Genera un binario universal (Intel y Apple silicon) y `build/SMN-Alertas-<versi�
 
 La app tiene una firma local (ad-hoc), no la de un desarrollador de Apple. En otra Mac, la primera vez hay que abrirla con clic derecho → Abrir, o desde Configuración del Sistema → Privacidad y seguridad → "Abrir igualmente".
 
-Para que abra sola al iniciar sesión, agregala en Configuración del Sistema → General → Ítems de inicio.
+Para que abra sola al iniciar sesión, activalo en Ajustes.
+
+El ícono de la app se dibuja con `swift scripts/make-icon.swift`, que regenera `Resources/AppIcon.icns`.
 
 ## Código
 

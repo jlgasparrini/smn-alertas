@@ -5,8 +5,10 @@ import SMNCore
 /// System notifications and the per-level alert sound.
 @MainActor
 final class AlertNotifier: NSObject, UNUserNotificationCenterDelegate {
-    /// Called when the user clicks a notification.
+    /// Called when the user clicks a notification or its "Ver detalles" button.
     var onOpen: () -> Void = {}
+    /// Called from the "Silenciar" button: stop blinking and sound without opening the panel.
+    var onSilence: () -> Void = {}
     /// Called when macOS permission changes; `false` means alerts would fail silently, so the UI must say so.
     var onAuthorizationChange: (Bool) -> Void = { _ in }
     private var allowed: Bool?
@@ -15,7 +17,14 @@ final class AlertNotifier: NSObject, UNUserNotificationCenterDelegate {
     override init() {
         super.init()
         center.delegate = self
+        center.setNotificationCategories([UNNotificationCategory(
+            identifier: Self.category,
+            actions: [UNNotificationAction(identifier: Self.details, title: "Ver detalles", options: [.foreground]),
+                      UNNotificationAction(identifier: Self.silence, title: "Silenciar")],
+            intentIdentifiers: [])])
     }
+
+    private nonisolated static let category = "alert", details = "details", silence = "silence"
 
     // Callbacks are @Sendable: the system calls them on a background queue, and a main-actor
     // closure would trap at runtime in Swift 6.
@@ -49,6 +58,7 @@ final class AlertNotifier: NSObject, UNUserNotificationCenterDelegate {
         content.title = "\(alert.level.emoji) \(alert.levelLabel): \(alert.displayEvent)"
         content.subtitle = validity(of: alert)
         content.body = body
+        content.categoryIdentifier = Self.category
         content.sound = nil        // the app plays its own per-level sound; avoid a double chime
         center.add(UNNotificationRequest(identifier: alert.identifier, content: content, trigger: nil))
     }
@@ -76,7 +86,8 @@ final class AlertNotifier: NSObject, UNUserNotificationCenterDelegate {
     }
 
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
-        await MainActor.run { onOpen() }
+        let silence = response.actionIdentifier == Self.silence
+        await MainActor.run { silence ? onSilence() : onOpen() }
     }
 }
 

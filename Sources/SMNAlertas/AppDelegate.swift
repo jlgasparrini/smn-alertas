@@ -19,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.mainMenu = Self.mainMenu()
         model.onAlarm = { [unowned self] level, reaction in statusItem.startAlarm(level, reaction) }
         model.onOpenPanel = { [unowned self] in statusItem.showPopover() }
+        model.onSilence = { [unowned self] in statusItem.stopAlarm() }
         model.onOpenSettings = { [unowned self] in settings.show() }
         _ = statusItem
         model.start()

@@ -21,7 +21,8 @@ for arch in arm64 x86_64; do
 done
 APP="build/SMN Alertas.app"
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+cp Resources/AppIcon.icns "$APP/Contents/Resources/"     # regenerate with: swift scripts/make-icon.swift
 lipo -create -output "$APP/Contents/MacOS/SMNAlertas" \
     "$SCRATCH/arm64-apple-macosx/release/SMNAlertas" "$SCRATCH/x86_64-apple-macosx/release/SMNAlertas"
 cat > "$APP/Contents/Info.plist" <<PLIST
@@ -30,6 +31,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <plist version="1.0"><dict>
   <key>CFBundleName</key><string>SMN Alertas</string>
   <key>CFBundleIdentifier</key><string>local.smnalertas</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundleExecutable</key><string>SMNAlertas</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>$VERSION</string>

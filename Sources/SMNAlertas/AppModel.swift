@@ -17,6 +17,8 @@ final class AppModel: ObservableObject {
     var onAlarm: (AlertLevel, AlarmPolicy.Reaction) -> Void = { _, _ in }
     /// Asks the menu bar to open the panel (notification clicked).
     var onOpenPanel: () -> Void = {}
+    /// Asks the menu bar to stop blinking and sounding ("Silenciar" on the notification).
+    var onSilence: () -> Void = {}
     /// Opens the Settings window.
     var onOpenSettings: () -> Void = {}
 
@@ -31,6 +33,7 @@ final class AppModel: ObservableObject {
         monitor.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &cancellables)
         notifier.onAuthorizationChange = { [weak self] allowed in self?.notificationsAllowed = allowed }
         notifier.onOpen = { [weak self] in self?.onOpenPanel() }
+        notifier.onSilence = { [weak self] in self?.onSilence() }
     }
 
     // MARK: - What the UI shows
