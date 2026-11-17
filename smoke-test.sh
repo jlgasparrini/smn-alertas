@@ -4,10 +4,10 @@
 #   ./smoke-test.sh            (build first with ./build-app.sh)
 set -u
 cd "$(dirname "$0")"
-APP="build/SMN Alertas.app"
+APP="build/Truenito.app"
 [ -d "$APP" ] || { echo "✘ $APP not found; run ./build-app.sh first"; exit 1; }
 
-pkill -f "SMN Alertas.app/Contents/MacOS/SMNAlertas" 2>/dev/null
+pkill -f "Truenito.app/Contents/MacOS/Truenito" 2>/dev/null
 sleep 1
 START=$(date "+%Y-%m-%d %H:%M:%S")
 open "$APP"
@@ -15,15 +15,15 @@ echo "Waiting 30 s for the first check…"
 sleep 30
 
 fail=0
-logs=$(/usr/bin/log show --start "$START" --predicate 'subsystem == "local.smnalertas"' --style compact 2>/dev/null)
+logs=$(/usr/bin/log show --start "$START" --predicate 'subsystem == "io.github.jlgasparrini.truenito"' --style compact 2>/dev/null)
 
-if pgrep -f "SMN Alertas.app/Contents/MacOS/SMNAlertas" >/dev/null; then
+if pgrep -f "Truenito.app/Contents/MacOS/Truenito" >/dev/null; then
     echo "✔ app is running"
 else
     echo "✘ app is not running (crashed?) — see ~/Library/Logs/DiagnosticReports"; fail=1
 fi
 
-if find ~/Library/Logs/DiagnosticReports -name 'SMNAlertas-*' -newermt "$START" 2>/dev/null | grep -q .; then
+if find ~/Library/Logs/DiagnosticReports -name 'Truenito-*' -newermt "$START" 2>/dev/null | grep -q .; then
     echo "✘ new crash report since launch"; fail=1
 fi
 

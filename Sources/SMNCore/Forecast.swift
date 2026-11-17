@@ -1,22 +1,43 @@
 import Foundation
 
-/// Hourly forecast from Open-Meteo (free, no key).
+/// Hourly forecast from Open-Meteo (free, no key), turned into `HourPoint`s once when decoded.
 public struct HourlyForecast: Decodable, Sendable {
-    public struct Hourly: Decodable, Sendable {
-        public let time: [String]
-        public let precipitation: [Double?]
-        public let precipitation_probability: [Int?]
-        public let wind_gusts_10m: [Double?]
-        public let weather_code: [Int?]
-        public let snowfall: [Double?]
-    }
-    public let hourly: Hourly
-    public let utc_offset_seconds: Int
+    public let hours: [HourPoint]
 
     public static func url(for c: Coordinate) -> URL {
         URL(string: "https://api.open-meteo.com/v1/forecast?latitude=\(c.lat)&longitude=\(c.lon)"
-            + "&hourly=precipitation,precipitation_probability,wind_gusts_10m,weather_code,snowfall"
+            + "&hourly=precipitation,wind_gusts_10m,weather_code,snowfall"
             + "&timezone=auto&forecast_days=3")!
+    }
+
+    private struct Raw: Decodable {
+        struct Hourly: Decodable {
+            let time: [String]
+            let precipitation: [Double?]
+            let wind_gusts_10m: [Double?]
+            let weather_code: [Int?]
+            let snowfall: [Double?]
+        }
+        let hourly: Hourly
+        let utc_offset_seconds: Int
+    }
+
+    /// Missing values count as zero.
+    public init(from decoder: Decoder) throws {
+        let raw = try Raw(from: decoder)
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd'T'HH:mm"
+        fmt.locale = Locale(identifier: "en_US_POSIX")
+        fmt.timeZone = TimeZone(secondsFromGMT: raw.utc_offset_seconds)
+        let h = raw.hourly
+        hours = h.time.indices.compactMap { i in
+            guard let t = fmt.date(from: h.time[i]) else { return nil }
+            return HourPoint(date: t,
+                             precipitation: (h.precipitation[safe: i] ?? nil) ?? 0,
+                             gust: (h.wind_gusts_10m[safe: i] ?? nil) ?? 0,
+                             weatherCode: h.weather_code[safe: i] ?? nil,
+                             snowfall: (h.snowfall[safe: i] ?? nil) ?? 0)
+        }
     }
 }
 
@@ -60,21 +81,9 @@ public struct HourPoint: Identifiable, Equatable, Sendable {
 }
 
 extension HourlyForecast {
-    /// Hours overlapping `from..<to`. Missing values count as zero.
+    /// Hours overlapping `from..<to`.
     public func points(from: Date, to: Date) -> [HourPoint] {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd'T'HH:mm"
-        fmt.locale = Locale(identifier: "en_US_POSIX")
-        fmt.timeZone = TimeZone(secondsFromGMT: utc_offset_seconds)
-        let h = hourly
-        return h.time.indices.compactMap { i in
-            guard let t = fmt.date(from: h.time[i]), t.addingTimeInterval(3600) > from, t < to else { return nil }
-            return HourPoint(date: t,
-                             precipitation: (h.precipitation[safe: i] ?? nil) ?? 0,
-                             gust: (h.wind_gusts_10m[safe: i] ?? nil) ?? 0,
-                             weatherCode: h.weather_code[safe: i] ?? nil,
-                             snowfall: (h.snowfall[safe: i] ?? nil) ?? 0)
-        }
+        hours.filter { $0.date.addingTimeInterval(3600) > from && $0.date < to }
     }
 }
 

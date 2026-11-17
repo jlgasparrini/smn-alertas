@@ -1,10 +1,11 @@
 import Foundation
 
 /// ssl.smn.gob.ar/CAP/AR.php serves RSS to apps and an HTML view to browsers; both list the CAP XML URLs.
+private let capLinkPattern = try! NSRegularExpression(pattern: #"(https://ssl\.smn\.gob\.ar/feeds/CAP/[^"<\s]+\.xml)"#)
+
 public func capLinks(in feed: String) -> [URL] {
-    let regex = try! NSRegularExpression(pattern: #"(https://ssl\.smn\.gob\.ar/feeds/CAP/[^"<\s]+\.xml)"#)
     var seen = Set<String>()
-    return regex.matches(in: feed, range: NSRange(feed.startIndex..., in: feed)).compactMap { m in
+    return capLinkPattern.matches(in: feed, range: NSRange(feed.startIndex..., in: feed)).compactMap { m in
         let s = String(feed[Range(m.range(at: 1), in: feed)!])
         return seen.insert(s).inserted ? URL(string: s) : nil
     }
@@ -21,6 +22,7 @@ public final class CAPParser: NSObject, XMLParserDelegate {
     private var alert = CAPAlert()
     private var text = ""
     private var sawInfo = false
+    private let iso = ISO8601DateFormatter()
 
     public static func parse(_ data: Data, url: URL? = nil) -> CAPAlert? {
         let delegate = CAPParser()
@@ -50,8 +52,8 @@ public final class CAPParser: NSObject, XMLParserDelegate {
         case "instruction": alert.instruction = value
         case "severity": alert.severity = value
         case "areaDesc": alert.areaDesc = value
-        case "onset": alert.onset = ISO8601DateFormatter().date(from: value)
-        case "expires": alert.expires = ISO8601DateFormatter().date(from: value)
+        case "onset": alert.onset = iso.date(from: value)
+        case "expires": alert.expires = iso.date(from: value)
         case "polygon":
             let points = value.split(separator: " ").compactMap { pair -> Coordinate? in
                 let p = pair.split(separator: ",")

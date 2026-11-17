@@ -10,7 +10,7 @@ public struct AlertGroup: Identifiable, Sendable {
 
     public let alerts: [CAPAlert]         // sorted by expiry
 
-    public var id: String { (worst.isShortTerm ? "ACP:" : "") + worst.event.uppercased() }
+    public var id: String { worst.eventKey }
     public var worst: CAPAlert { mostSevere(alerts)! }
     public var isShortTerm: Bool { worst.isShortTerm }
     public var mentionsHail: Bool { alerts.contains(where: \.mentionsHail) }
@@ -31,7 +31,7 @@ public struct AlertGroup: Identifiable, Sendable {
 /// Groups alerts by phenomenon (short-term notices apart), most urgent first:
 /// notices happening now, then the highest level, then the one ending soonest.
 public func groupAlerts(_ alerts: [CAPAlert]) -> [AlertGroup] {
-    let byKey = Dictionary(grouping: alerts) { ($0.isShortTerm ? "ACP:" : "") + $0.event.uppercased() }
+    let byKey = Dictionary(grouping: alerts, by: \.eventKey)
     return byKey.values
         .map { AlertGroup(alerts: $0.sorted { ($0.expires ?? .distantFuture) < ($1.expires ?? .distantFuture) }) }
         .sorted { a, b in

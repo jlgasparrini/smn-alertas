@@ -19,11 +19,12 @@ public enum FetchError: LocalizedError, Equatable {
 
 public struct URLSessionHTTPClient: HTTPClient {
     public init() {}
+    static let userAgent = "Truenito/\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev") (macOS)"
 
     public func data(from url: URL) async throws -> Data {
         var request = URLRequest(url: url, timeoutInterval: 20)
         // A non-browser agent gets the RSS version of the SMN feed.
-        request.setValue("SMNAlertas/1.0 (macOS)", forHTTPHeaderField: "User-Agent")
+        request.setValue(Self.userAgent, forHTTPHeaderField: "User-Agent")
         let (data, response) = try await URLSession.shared.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard status == 200 else { throw FetchError.status(status) }
@@ -46,9 +47,9 @@ public struct DiskCAPStore: CAPStore {
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     }
 
-    /// ~/Library/Application Support/SMNAlertas/cap
+    /// ~/Library/Application Support/Truenito/cap
     public static var standard: DiskCAPStore {
-        DiskCAPStore(directory: URL.applicationSupportDirectory.appending(path: "SMNAlertas/cap", directoryHint: .isDirectory))
+        DiskCAPStore(directory: URL.applicationSupportDirectory.appending(path: "Truenito/cap", directoryHint: .isDirectory))
     }
 
     func file(_ url: URL) -> URL { directory.appending(path: url.pathComponents.suffix(2).joined(separator: "__")) }

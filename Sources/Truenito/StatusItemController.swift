@@ -10,6 +10,8 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     private let popover = NSPopover()
     private let model: AppModel
     private var alarmTask: Task<Void, Never>?
+    /// Icon with and without the level dot, rebuilt only when the state changes: blinking just swaps them.
+    private var icons: (dot: NSImage, noDot: NSImage)?
     private var cancellables: Set<AnyCancellable> = []
 
     init(model: AppModel) {
@@ -22,10 +24,10 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         popover.delegate = self
         item.button?.target = self
         item.button?.action = #selector(togglePopover)
-        setIcon(dotVisible: true)
+        updateIcon()
         // objectWillChange fires before the change; read the new state on the next run loop pass.
         model.objectWillChange.receive(on: RunLoop.main)
-            .sink { [weak self] in if self?.alarmTask == nil { self?.setIcon(dotVisible: true) } }
+            .sink { [weak self] in self?.updateIcon() }
             .store(in: &cancellables)
     }
 
@@ -54,7 +56,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
                 try? await Task.sleep(for: .milliseconds(500))
                 guard let self, !Task.isCancelled else { return }
                 tick += 1
-                setIcon(dotVisible: tick % 2 == 0)
+                item.button?.image = tick % 2 == 0 ? icons?.dot : icons?.noDot
                 if case .sound(repeating: true) = reaction, tick % 8 == 0, tick <= 240 {
                     model.notifier.playSound(for: level)
                 }
@@ -65,12 +67,15 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     func stopAlarm() {
         alarmTask?.cancel()
         alarmTask = nil
-        setIcon(dotVisible: true)
+        item.button?.image = icons?.dot
     }
 
-    private func setIcon(dotVisible: Bool) {
+    private func updateIcon() {
         guard let button = item.button else { return }
-        button.image = menuBarImage(for: mostSevere(model.alerts), dotVisible: dotVisible)
+        let alert = mostSevere(model.alerts)
+        let icons = (dot: menuBarImage(for: alert), noDot: menuBarImage(for: alert, dotVisible: false))
+        self.icons = icons
+        if alarmTask == nil { button.image = icons.dot }          // while blinking, the next tick picks it up
         let temperature = model.showTemperature ? model.places.first?.current?.temperatureText : nil
         button.title = temperature ?? ""
         button.imagePosition = temperature == nil ? .imageOnly : .imageLeading

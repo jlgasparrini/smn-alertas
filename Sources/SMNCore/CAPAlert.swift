@@ -23,6 +23,8 @@ public struct CAPAlert: Identifiable, Hashable, Sendable {
     public init() {}
 
     public var id: String { identifier }
+    /// One phenomenon across SMN's re-issues and time slots; short-term notices kept apart.
+    public var eventKey: String { (isShortTerm ? "ACP:" : "") + event.uppercased() }
     public var level: AlertLevel { AlertLevel(severity: severity, headline: headline) }
     /// "Aviso a muy corto plazo": the storm is already happening.
     public var isShortTerm: Bool { url?.path.contains("avisocortoplazo") == true }
@@ -74,15 +76,11 @@ public func alertsToNotify(active: [CAPAlert], previous: [String: AlertLevel])
     -> (notify: [CAPAlert], state: [String: AlertLevel]) {
     var worst: [String: CAPAlert] = [:]
     for a in active {
-        let key = (a.isShortTerm ? "ACP:" : "") + a.event.uppercased()
-        if let w = worst[key], w.level >= a.level { continue }
-        worst[key] = a
+        if let w = worst[a.eventKey], w.level >= a.level { continue }
+        worst[a.eventKey] = a
     }
     let state = worst.mapValues(\.level)
-    let notify = worst.values.filter { a in
-        let key = (a.isShortTerm ? "ACP:" : "") + a.event.uppercased()
-        return previous[key].map { a.level > $0 } ?? true
-    }
+    let notify = worst.values.filter { a in previous[a.eventKey].map { a.level > $0 } ?? true }
     return (notify.sorted { $0.level > $1.level }, state)
 }
 

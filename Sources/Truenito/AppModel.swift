@@ -82,7 +82,7 @@ final class AppModel: ObservableObject {
     }
 
     /// Every alert in force, for the menu bar icon.
-    var alerts: [CAPAlert] { places.flatMap(\.alerts) }
+    var alerts: [CAPAlert] { isDemo ? places.flatMap(\.alerts) : monitor.alerts }
 
     var isDemo: Bool {
         #if DEV_TOOLS

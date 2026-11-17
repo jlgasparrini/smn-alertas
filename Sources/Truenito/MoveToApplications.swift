@@ -15,7 +15,7 @@ enum MoveToApplications {
 
         NSApp.activate(ignoringOtherApps: true)          // menu bar apps start in the background
         let ask = NSAlert()
-        ask.messageText = "¿Mover SMN Alertas a Aplicaciones?"
+        ask.messageText = "¿Mover Truenito a Aplicaciones?"
         ask.informativeText = "Desde ahí puede actualizarse sola y queda junto a tus otras apps."
         ask.addButton(withTitle: "Mover a Aplicaciones")
         ask.addButton(withTitle: "No mover")
@@ -33,7 +33,7 @@ enum MoveToApplications {
         } catch {
             let fail = NSAlert()
             fail.messageText = "No se pudo mover"
-            fail.informativeText = "Arrastrá SMN Alertas a la carpeta Aplicaciones desde el Finder.\n\n\(error.localizedDescription)"
+            fail.informativeText = "Arrastrá Truenito a la carpeta Aplicaciones desde el Finder.\n\n\(error.localizedDescription)"
             fail.runModal()
             return false
         }

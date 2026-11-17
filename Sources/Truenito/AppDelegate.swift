@@ -2,7 +2,7 @@ import AppKit
 import os
 import SMNCore
 
-let log = Logger(subsystem: "local.smnalertas", category: "app")
+let log = Logger(subsystem: "io.github.jlgasparrini.truenito", category: "app")
 
 /// Creates the model and the two pieces of UI, and wires them together.
 @MainActor
@@ -36,7 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Main-menu key equivalents work from the panel and the Settings window alike.
         app.addItem(withTitle: "Ajustes…", action: #selector(openSettings), keyEquivalent: ",")
         app.addItem(.separator())
-        app.addItem(withTitle: "Salir de SMN Alertas", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        app.addItem(withTitle: "Salir de Truenito", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         let edit = NSMenu(title: "Edición")
         edit.addItem(withTitle: "Cortar", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
         edit.addItem(withTitle: "Copiar", action: #selector(NSText.copy(_:)), keyEquivalent: "c")

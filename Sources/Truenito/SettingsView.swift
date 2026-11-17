@@ -114,6 +114,17 @@ struct SettingsView: View {
                     }
                 }
             }
+
+            // Open-Meteo's data license (CC BY 4.0) asks for attribution.
+            Section {
+                LabeledContent("Alertas") { Link("Servicio Meteorológico Nacional", destination: URL(string: "https://www.smn.gob.ar")!) }
+                LabeledContent("Clima y búsqueda") { Link("Open-Meteo (CC BY 4.0)", destination: URL(string: "https://open-meteo.com")!) }
+                LabeledContent("Código abierto") { Link("GitHub", destination: URL(string: "https://github.com/jlgasparrini/truenito")!) }
+            } header: {
+                Text("Acerca de")
+            } footer: {
+                Text("App no oficial, hecha por un particular. No está asociada al SMN.")
+            }
         }
         .formStyle(.grouped)
         .task(id: query) { await search() }
@@ -166,7 +177,7 @@ final class SettingsWindowController {
             let host = NSHostingController(rootView: SettingsView().environmentObject(model))
             host.sizingOptions = .preferredContentSize
             let w = NSWindow(contentViewController: host)
-            w.title = "Ajustes de SMN Alertas"
+            w.title = "Ajustes de Truenito"
             w.styleMask = [.titled, .closable]
             w.isReleasedWhenClosed = false
             w.center()

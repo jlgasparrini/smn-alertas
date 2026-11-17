@@ -2,7 +2,7 @@ import Combine
 import Foundation
 import os
 
-private let log = Logger(subsystem: "local.smnalertas", category: "monitor")
+private let log = Logger(subsystem: "io.github.jlgasparrini.truenito", category: "monitor")
 
 /// Polls the SMN CAP feed and tracks which alerts cover each of the user's cities.
 /// Network, disk and clock are injected so the whole flow can be tested without the real SMN.
@@ -21,6 +21,9 @@ public final class AlertMonitor: ObservableObject {
     private let maxDownloads: Int
     private let now: @Sendable () -> Date
     private var cache: [URL: CAPAlert?] = [:]      // .some(nil): downloaded, but not a usable alert
+    private var weatherFetchedAt: Date?
+    /// Open-Meteo refreshes current conditions every 15 min; asking more often only costs requests.
+    static let weatherInterval: TimeInterval = 15 * 60
     /// True while a check runs; the panel shows a spinner instead of the refresh button.
     @Published public private(set) var isChecking = false
 
@@ -65,13 +68,23 @@ public final class AlertMonitor: ObservableObject {
                 defaults.set(region, forKey: Key.region)
             }
             // Weather only enriches the panel: a failure must never hold back an SMN alert.
+            let weatherDue = weatherFetchedAt.map { current.timeIntervalSince($0) >= Self.weatherInterval } ?? true
             for i in found.indices {
                 let c = found[i].city.coordinate
-                found[i].current = (try? JSONDecoder().decode(CurrentWeather.self, from: await http.data(from: CurrentWeather.url(for: c))))
-                    ?? places.first { $0.city == found[i].city }?.current          // keep the last reading on a blip
+                let before = places.first { $0.city == found[i].city }
+                found[i].current = before?.current
+                if weatherDue || found[i].current == nil,
+                   let fresh = try? JSONDecoder().decode(CurrentWeather.self, from: await http.data(from: CurrentWeather.url(for: c))) {
+                    found[i].current = fresh                  // on a failure the last reading stays
+                }
                 guard !found[i].alerts.isEmpty else { continue }
-                found[i].forecast = try? JSONDecoder().decode(HourlyForecast.self, from: await http.data(from: HourlyForecast.url(for: c)))
+                found[i].forecast = before?.forecast
+                if weatherDue || found[i].forecast == nil,
+                   let fresh = try? JSONDecoder().decode(HourlyForecast.self, from: await http.data(from: HourlyForecast.url(for: c))) {
+                    found[i].forecast = fresh
+                }
             }
+            if weatherDue { weatherFetchedAt = current }
             places = found
             lastError = nil
             let notices = updateNotificationState(cities: cities, at: current)

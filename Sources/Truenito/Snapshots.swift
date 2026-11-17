@@ -3,7 +3,7 @@ import AppKit
 import SMNCore
 import SwiftUI
 
-/// `SMNAlertas --snapshots <dir>` (development builds): renders the panel for every demo state and
+/// `Truenito --snapshots <dir>` (development builds): renders the panel for every demo state and
 /// the Settings window, in light and dark, to PNGs. Lets you review the UI without screen-capture access.
 @MainActor
 enum Snapshots {

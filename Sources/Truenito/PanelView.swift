@@ -63,7 +63,7 @@ struct PanelView: View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(alignment: .center) {
                 // A pin, not the GPS arrow: the cities are chosen by hand.
-                Label(several ? "SMN Alertas" : model.cities.first?.name ?? "SMN Alertas",
+                Label(several ? "Truenito" : model.cities.first?.name ?? "Truenito",
                       systemImage: several ? "mappin.and.ellipse" : "mappin")
                     .font(.headline)
                     .labelStyle(.titleAndIcon)
@@ -102,7 +102,7 @@ struct PanelView: View {
                 }
                 #endif
                 Divider()
-                Button("Salir de SMN Alertas") { NSApp.terminate(nil) }
+                Button("Salir de Truenito") { NSApp.terminate(nil) }
             } label: {
                 Image(systemName: "ellipsis.circle")
             }
@@ -175,12 +175,16 @@ struct PanelView: View {
         }
     }
 
+    private static let relative = {
+        let f = RelativeDateTimeFormatter()
+        f.locale = Locale(identifier: "es_AR")
+        return f
+    }()
+
     private var statusLine: String {
         if let error = model.monitor.lastError { return error }
         guard let last = model.monitor.lastCheck else { return "Consultando al SMN…" }
-        let f = RelativeDateTimeFormatter()
-        f.locale = Locale(identifier: "es_AR")
-        var text = "Actualizado " + f.localizedString(for: last, relativeTo: .now)
+        var text = "Actualizado " + Self.relative.localizedString(for: last, relativeTo: .now)
         if model.monitor.pendingZones > 0 { text += " · faltan \(model.monitor.pendingZones) zonas" }
         return text
     }

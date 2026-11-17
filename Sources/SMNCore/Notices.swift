@@ -68,7 +68,7 @@ public func planNotices(places: [Place], previous: NoticeState, now: Date, parti
                 notices.append(.ended(event: event, level: level, city: place.city))
             }
         }
-        let justAnnounced = Set(fresh.map { ($0.isShortTerm ? "ACP:" : "") + $0.event.uppercased() })
+        let justAnnounced = Set(fresh.map(\.eventKey))
         for group in groupAlerts(place.alerts) where !group.isShortTerm {
             let steps = group.timeline
             for i in steps.indices.dropFirst() where steps[i].level > steps[i - 1].level {

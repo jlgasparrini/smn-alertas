@@ -50,7 +50,7 @@ final class AlertNotifier: NSObject, UNUserNotificationCenterDelegate {
     }
 
     func openNotificationSettings() {
-        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=local.smnalertas")!)
+        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=\(Bundle.main.bundleIdentifier ?? "")")!)
     }
 
     /// `city` is named only when the user follows more than one.
@@ -111,15 +111,20 @@ final class AlertNotifier: NSObject, UNUserNotificationCenterDelegate {
 }
 
 /// "Vigente hasta lun 16 18:00".
-func validity(of alert: CAPAlert) -> String {
+@MainActor func validity(of alert: CAPAlert) -> String {
     guard let expires = alert.expires else { return "Vigente" }
     return "Vigente hasta \(formatted(expires, "EEE d HH:mm"))"
 }
 
 /// Date in Argentine Spanish with a fixed pattern, e.g. "EEE d HH:mm" -> "lun 16 18:00".
-func formatted(_ date: Date, _ pattern: String) -> String {
+/// Formatters are costly to create and the panel redraws often, so one is kept per pattern.
+@MainActor func formatted(_ date: Date, _ pattern: String) -> String {
+    if let f = formatters[pattern] { return f.string(from: date) }
     let f = DateFormatter()
     f.dateFormat = pattern
     f.locale = Locale(identifier: "es_AR")
+    formatters[pattern] = f
     return f.string(from: date)
 }
+
+@MainActor private var formatters: [String: DateFormatter] = [:]
