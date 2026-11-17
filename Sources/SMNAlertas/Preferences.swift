@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import SMNCore
 
 /// User settings. The toggles are read with @AppStorage in Settings using these same keys.
@@ -10,6 +10,7 @@ enum Preferences {
         static let quietYellowAtNight = "quietYellowAtNight"
         static let minimumLevel = "minimumLevel"
         static let cities = "cities"
+        static let appearance = "appearance"      // "system", "light" or "dark"
     }
 
     private static var defaults: UserDefaults { .standard }
@@ -36,6 +37,15 @@ enum Preferences {
         set {
             defaults.set(try? JSONEncoder().encode(newValue), forKey: Key.cities)
             for key in ["cityName", "lat", "lon"] { defaults.removeObject(forKey: key) }
+        }
+    }
+
+    /// Panel and Settings follow macOS unless the user fixed light or dark.
+    static func applyAppearance() {
+        NSApp.appearance = switch defaults.string(forKey: Key.appearance) {
+        case "light": NSAppearance(named: .aqua)
+        case "dark": NSAppearance(named: .darkAqua)
+        default: nil
         }
     }
 

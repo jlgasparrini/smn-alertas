@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import SMNCore
+import Sparkle
 
 /// What the panel shows for one city.
 struct PlaceStatus: Identifiable {
@@ -19,6 +20,13 @@ final class AppModel: ObservableObject {
 
     let monitor = AlertMonitor()
     let notifier = AlertNotifier()
+    /// Sparkle checks the GitHub appcast once a day when enabled. Development builds never update themselves.
+    #if DEV_TOOLS
+    let updater: SPUUpdater? = nil
+    #else
+    let updater: SPUUpdater? = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil,
+                                                            userDriverDelegate: nil).updater
+    #endif
     @Published private(set) var cities: [City] = Preferences.cities
     @Published private(set) var notificationsAllowed = true
 
@@ -115,6 +123,11 @@ final class AppModel: ObservableObject {
     }
 
     func openNotificationSettings() { notifier.openNotificationSettings() }
+
+    func checkForUpdates() {
+        NSApp.activate(ignoringOtherApps: true)      // menu bar apps start in the background; bring the dialog forward
+        updater?.checkForUpdates()
+    }
 
     // MARK: - Alerting
 

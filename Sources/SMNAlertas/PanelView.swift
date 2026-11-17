@@ -81,6 +81,7 @@ struct PanelView: View {
             .accessibilityLabel("Actualizar")
             Menu {
                 Button("Ajustes…") { model.onOpenSettings() }.keyboardShortcut(",")
+                if model.updater != nil { Button("Buscar actualizaciones…") { model.checkForUpdates() } }
                 #if DEV_TOOLS
                 Menu("Probar estados") {
                     ForEach(DemoState.all, id: \.title) { state in Button(state.title) { model.runDemo(state) } }

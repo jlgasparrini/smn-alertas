@@ -34,8 +34,8 @@ En el build de desarrollo, **Probar estados** (menú ··· del panel) simula ca
 Necesita macOS 13 o superior y las Command Line Tools de Xcode (no hace falta Xcode).
 
 ```sh
-./build-app.sh 1.3.0          # producción: app universal + zip para la release
-./build-app.sh 1.3.0 --dev    # desarrollo: agrega "Probar estados" en el menú ··· del panel
+./build-app.sh 1.4.0          # producción: app universal + zip para la release
+./build-app.sh 1.4.0 --dev    # desarrollo: agrega "Probar estados" en el menú ··· del panel
 open "build/SMN Alertas.app"
 ```
 
@@ -65,3 +65,15 @@ La interfaz se revisa a mano con "Probar estados" (build de desarrollo) o genera
 ```sh
 "build/SMN Alertas.app/Contents/MacOS/SMNAlertas" --snapshots /tmp/smn-capturas   # solo build de desarrollo
 ```
+
+## Actualizaciones automáticas
+
+La app usa [Sparkle](https://sparkle-project.org): una vez por día lee `appcast.xml` de la última release de GitHub y, si hay una versión nueva, pregunta antes de instalarla. Se puede apagar en Ajustes → Actualizaciones.
+
+Para publicar una versión:
+
+1. `./build-app.sh X.Y.Z` genera el zip y `build/appcast.xml`, firmados con la clave EdDSA guardada en el Llavero (cuenta `smn-alertas`).
+2. Crear la release `vX.Y.Z` en GitHub y subir **los dos** archivos.
+
+El repo tiene que ser público para que la app pueda leer el appcast. Si se pierde la clave privada, las copias instaladas ya no aceptan actualizaciones; hacé un respaldo con `.build/artifacts/sparkle/Sparkle/bin/generate_keys --account smn-alertas -x clave-sparkle.txt` y guardalo fuera del repo.
+

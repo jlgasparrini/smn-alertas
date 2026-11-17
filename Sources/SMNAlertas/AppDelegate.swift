@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Preferences.registerDefaults()
+        Preferences.applyAppearance()
         #if DEV_TOOLS
         Snapshots.runIfRequested()
         #endif

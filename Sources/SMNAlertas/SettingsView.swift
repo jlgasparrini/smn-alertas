@@ -9,6 +9,7 @@ struct SettingsView: View {
     @AppStorage(Preferences.Key.soundEnabled) private var soundEnabled = true
     @AppStorage(Preferences.Key.repeatUntilSeen) private var repeatUntilSeen = true
     @AppStorage(Preferences.Key.quietYellowAtNight) private var quietYellowAtNight = false
+    @AppStorage(Preferences.Key.appearance) private var appearance = "system"
     @AppStorage(Preferences.Key.minimumLevel) private var minimumLevel = AlertLevel.yellow.rawValue
 
     @State private var query = ""
@@ -16,6 +17,7 @@ struct SettingsView: View {
     @State private var searchFailed = false
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var loginNote: String?
+    @State private var autoUpdate = true
 
     var body: some View {
         Form {
@@ -78,7 +80,26 @@ struct SettingsView: View {
                 .disabled(!soundEnabled)
             }
 
+            if let updater = model.updater {
+                Section("Actualizaciones") {
+                    Toggle(isOn: Binding(get: { autoUpdate }, set: { autoUpdate = $0; updater.automaticallyChecksForUpdates = $0 })) {
+                        Text("Buscar actualizaciones automáticamente")
+                        Text("Una vez por día. Antes de instalar te pregunta.")
+                    }
+                    LabeledContent("Versión \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")") {
+                        Button("Buscar ahora") { model.checkForUpdates() }
+                    }
+                }
+                .onAppear { autoUpdate = updater.automaticallyChecksForUpdates }
+            }
+
             Section("General") {
+                Picker("Apariencia", selection: $appearance) {
+                    Text("Como el sistema").tag("system")
+                    Text("Clara").tag("light")
+                    Text("Oscura").tag("dark")
+                }
+                .onChange(of: appearance) { _ in Preferences.applyAppearance() }
                 Toggle("Abrir al iniciar sesión", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { setLaunchAtLogin($0) }
                 if let loginNote {
