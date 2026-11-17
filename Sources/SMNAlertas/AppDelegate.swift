@@ -15,6 +15,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Preferences.applyAppearance()
         #if DEV_TOOLS
         Snapshots.runIfRequested()
+        #else
+        if MoveToApplications.offerIfNeeded() { return }   // development builds run from build/
         #endif
         NSApp.mainMenu = Self.mainMenu()
         model.onAlarm = { [unowned self] level, reaction in statusItem.startAlarm(level, reaction) }

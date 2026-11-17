@@ -144,12 +144,16 @@ struct AlertMonitorTests {
 struct GeocoderTests {
     @Test func buildsCityNameWithProvince() async throws {
         let http = FakeHTTP()
-        let json = #"{"results":[{"name":"Río Cuarto","latitude":-33.13,"longitude":-64.35,"admin1":"Córdoba"}]}"#
+        let json = #"{"results":[{"name":"Río Cuarto","latitude":-33.13,"longitude":-64.35,"admin1":"Córdoba","feature_code":"PPLA2"},"#
+            + #"{"name":"Rio Cuarto","latitude":-33.16,"longitude":-64.33,"admin1":"Córdoba","feature_code":"AIRF"},"#
+            + #"{"name":"Río Cuarto","latitude":-33.2,"longitude":-64.3,"admin1":"Córdoba","feature_code":"PPL"}]}"#
         var comps = URLComponents(string: "https://geocoding-api.open-meteo.com/v1/search")!
-        comps.queryItems = [.init(name: "name", value: "rio cuarto"), .init(name: "count", value: "1"),
+        comps.queryItems = [.init(name: "name", value: "rio cuarto"), .init(name: "count", value: "15"),
                             .init(name: "language", value: "es"), .init(name: "countryCode", value: "AR")]
         await http.set(comps.url!, Data(json.utf8))
-        let city = try #require(try await Geocoder(http: http).search("rio cuarto").first)
+        let cities = try await Geocoder(http: http).search("rio cuarto", limit: 5)
+        #expect(cities.count == 1)        // the airfield and the repeated name are dropped
+        let city = try #require(cities.first)
         #expect(city.name == "Río Cuarto, Córdoba")
         #expect(city.coordinate == Coordinate(lat: -33.13, lon: -64.35))
     }

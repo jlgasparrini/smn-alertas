@@ -68,7 +68,7 @@ La interfaz se revisa a mano con "Probar estados" (build de desarrollo) o genera
 
 ## Actualizaciones automáticas
 
-La app usa [Sparkle](https://sparkle-project.org): una vez por día lee `appcast.xml` de la última release de GitHub y, si hay una versión nueva, pregunta antes de instalarla. Se puede apagar en Ajustes → Actualizaciones.
+La app usa [Sparkle](https://sparkle-project.org): una vez por día lee `appcast.xml` de la última release de GitHub y, si hay una versión nueva, pregunta antes de instalarla. Se puede apagar en Ajustes → Actualizaciones. Sparkle no actualiza una app abierta desde Descargas, por eso, si se abre fuera de Aplicaciones, la app ofrece moverse ahí una sola vez.
 
 Para publicar una versión:
 

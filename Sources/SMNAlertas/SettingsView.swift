@@ -56,7 +56,7 @@ struct SettingsView: View {
                 Text("Ciudades")
             } footer: {
                 if model.cities.count > 1 {
-                    Text("Te avisa si una alerta afecta a cualquiera de ellas; la notificación dice cuál.")
+                    Text("Te avisa por cualquiera de ellas y te dice cuál.")
                 }
             }
 

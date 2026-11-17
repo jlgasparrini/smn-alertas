@@ -75,18 +75,22 @@ public struct Geocoder: Sendable {
     public init(http: HTTPClient = URLSessionHTTPClient()) { self.http = http }
 
     struct Response: Decodable {
-        struct Result: Decodable { let name: String; let latitude: Double; let longitude: Double; let admin1: String? }
+        struct Result: Decodable { let name: String; let latitude: Double; let longitude: Double; let admin1: String?
+            let feature_code: String? }
         let results: [Result]?
     }
 
     public func search(_ query: String, limit: Int = 1) async throws -> [City] {
         var comps = URLComponents(string: "https://geocoding-api.open-meteo.com/v1/search")!
-        comps.queryItems = [.init(name: "name", value: query), .init(name: "count", value: String(limit)),
+        comps.queryItems = [.init(name: "name", value: query), .init(name: "count", value: String(limit * 3)),
                             .init(name: "language", value: "es"), .init(name: "countryCode", value: "AR")]
         let response = try JSONDecoder().decode(Response.self, from: try await http.data(from: comps.url!))
-        return (response.results ?? []).map {
-            City(name: [$0.name, $0.admin1].compactMap { $0 }.joined(separator: ", "),
-                 coordinate: Coordinate(lat: $0.latitude, lon: $0.longitude))
-        }
+        var seen = Set<String>()
+        // Only towns and cities (GeoNames PPL*): the API also returns airfields and airports named like the city.
+        return (response.results ?? []).filter { $0.feature_code?.hasPrefix("PPL") ?? true }.compactMap {
+            let name = [$0.name, $0.admin1].compactMap { $0 }.joined(separator: ", ")
+            guard seen.insert(name).inserted else { return nil }
+            return City(name: name, coordinate: Coordinate(lat: $0.latitude, lon: $0.longitude))
+        }.prefix(limit).map { $0 }
     }
 }
