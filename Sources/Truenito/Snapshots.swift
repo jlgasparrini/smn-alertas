@@ -18,7 +18,9 @@ enum Snapshots {
             model.runDemo(state, announce: false)
             render(PanelView().environmentObject(model), to: dir, name: "panel-\(n)")
         }
-        render(SettingsView().environmentObject(model), to: dir, name: "settings")
+        for tab in SettingsView.Tab.allCases {
+            render(SettingsView(tab: tab).environmentObject(model), to: dir, name: "settings-\(tab)")
+        }
         exit(0)
     }
 
